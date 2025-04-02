@@ -1,5 +1,5 @@
-OPC_SERVER = 'ABB.AC800MC_OpcDaServer.3'
-TOP_LEVEL = 'Applications'
+OPC_SERVER = None
+TOP_LEVEL = None
 
 WORKING_DIR = 'WorkingData//'
 DATA_TYPES_FILE = WORKING_DIR + 'Data_Types.json'
@@ -15,3 +15,6 @@ CONNECTED_LIBS = {
 ALIASES = [
 ("Automatically.identified.name","Alias")
 ]
+
+USED_OPC_OBJ_ATTRIBUTE_NAMES = ['opc_children','opc_path','name_prop','idx_prop','upgrade','load_children',
+                                '_create_variable','transform','_transform','compare_identity']

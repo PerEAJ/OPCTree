@@ -9,18 +9,30 @@ global opc_client
 def initiate_opc_client():
 	global opc_client
 	opc_client = OpenOPC.client()
-	opc_client.connect(settings.OPC_SERVER)
+	if not settings.OPC_SERVER is None:
+		opc_client.connect(settings.OPC_SERVER)
+	else:
+		opc_servers = opc_client.servers()
+		if len(opc_servers) == 0:
+			raise Exception("No OPC-servers available. Start the OPC-server before running this.")
+		for idx, name in enumerate(opc_client.servers()):
+			print(str(idx+1).ljust(5) + name)
+		idx = -1
+		while not 0 < int(idx) <= len(opc_servers):
+			idx = input("Chose a OPC-server to connect to [1-" + str(len(opc_servers)) + "] input 'a' to abort:")
+			if idx == r'a':
+				raise Exception('User aborted')
+		opc_client.connect(opc_servers[int(idx)-1])
 	return opc_client
 
 def connect_and_build(levels = -1):
 	global opc_client
 	initiate_opc_client()
-	return opc_obj.Generic(settings.TOP_LEVEL).load_children(opc_client, levels)
+	return opc_obj.Generic(settings.TOP_LEVEL).load_children(levels, opc_client)
 
 def load_existing():
 	return opc_obj.Generic(settings.TOP_LEVEL).restore()
 
-	"""
 def connect_and_extract_variables():
 	global nbr_loaded_vars
 	nbr_loaded_vars = 0
@@ -61,6 +73,5 @@ def save_vars(variables):
 if __name__ == "__main__":
 	# OPC_SERVER = 'ABB.AC800MC_OpcDaServer.3'
 	# TOP_LEVEL = 'Applications.MA_SJRA_AA.App.HMI.C01'
-	variables = connect_and_extract_variables(settings.OPC_SERVER,settings.TOP_LEVEL)
+	variables = connect_and_extract_variables()
 	print(variables)
-	"""

@@ -5,6 +5,7 @@ from importlib import reload, import_module
 import opc_vars
 
 global opc_client
+global guid_registry
 
 def is_type_of(first,second,or_inherited=True):
 	"""Compare if first is instance of second
@@ -53,6 +54,31 @@ def bcd_to_int(n):
 def int_to_bcd(n):
 	return int(str(n), base=16)
 
+def approve_opc_child_name(obj, item_name):
+	item_name = re.sub('[^0-9a-zA-Z_]+', '', item_name)
+	if item_name[0].isnumeric(): item_name = '_' + item_name
+	if hasattr(obj, item_name):
+		if isinstance(getattr(obj, item_name), Generic):
+			return item_name
+		elif isinstance(getattr(obj, item_name), opc_vars.OpcVariable):
+			return item_name
+		else:
+			item_name = approve_opc_child_name(obj, '_' + item_name)
+	return item_name
+
+def approve_name_and_register_guid(parent, obj, item_name):
+	find_result = re.findall('[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-5][0-9a-fA-F]{3}-[089ab][0-9a-fA-F]{3}-[0-9a-fA-F]{12}', item_name)
+	if len(find_result) == 0:
+		return approve_opc_child_name(parent, item_name)
+	else:
+		global guid_registry
+		if not 'guid_registry' in globals(): guid_registry = {}
+		guid_registry[find_result[-1]] = obj
+		for idx in range(len(find_result)):
+			item_name = item_name.replace(find_result[idx],'')
+		new_name = approve_opc_child_name(parent, item_name)
+		return new_name
+
 class Generic(object):
 	opc_path = None
 	opc_children = []
@@ -85,34 +111,42 @@ class Generic(object):
 	def test(self):
 		print('Test7')
 				
-	def load_children(self, opc_cli=None, levels = -1, counter=None):
+	def load_children(self, levels=-1, opc_cli=None, counter=None):
 		global opc_client
 		if not 'opc_client' in globals():
 			opc_client = opc_cli
 		elif opc_cli is None:
 			opc_cli = opc_client
-		if levels == 0: return self
+		if levels == 0: return self if counter is None else self, counter
 		result = opc_cli.list(self.opc_path)
 		self.opc_children = []
 		if counter is None: internal_counter = 0
 		else: internal_counter = counter
 		for item in result:
-			if self.opc_path in item:
+			if self.opc_path is None:
+				new_path = item
+				child, internal_counter = Generic(new_path).load_children(levels=levels-1,opc_cli=opc_cli,  counter=internal_counter)
+				item_name = approve_name_and_register_guid(self,child,item)
+				setattr(self, item_name, child)
+				self.opc_children.append(item_name)
+			elif self.opc_path in item:
 				# variable_properties = None
 				# variable_properties = opc_cli.properties(item)
 				variable_properties = None
 				# setattr(self,item.rsplit('.',1)[1],variable_properties)
 				child = self._create_variable(item,variable_properties)
 				var_name = item.rsplit('.',1)[1]
+				var_name = approve_name_and_register_guid(self, child, var_name)
 				self.opc_children.append(var_name)
 				internal_counter += 1
 				setattr(self,var_name,child)
 				print(str(internal_counter).ljust(7) + 'Loaded var:' + item.ljust(os.get_terminal_size().columns-19), end="\r")
 			else:
 				new_path = '.'.join([self.opc_path,item])
-				child, internal_counter = Generic(new_path).load_children(opc_cli, levels = levels-1, counter=internal_counter)
-				setattr(self,item,child)
-				self.opc_children.append(item)
+				child, internal_counter = Generic(new_path).load_children(levels=levels-1,opc_cli=opc_cli,  counter=internal_counter)
+				item_name = approve_name_and_register_guid(self, child, item)
+				setattr(self,item_name,child)
+				self.opc_children.append(item_name)
 		if counter is None:
 			print()
 			return self
@@ -177,8 +211,9 @@ class Generic(object):
 		for child in children:
 			if not filter_func is None:
 				if not filter_func(child): continue
-			adopting_parent.opc_children.append(child.opc_path.replace('.','_'))
-			setattr(adopting_parent,child.opc_path.replace('.','_'),child)
+			new_attr_name = approve_name_and_register_guid(adopting_parent, child, child.opc_path.replace('.','_'))
+			adopting_parent.opc_children.append(new_attr_name)
+			setattr(adopting_parent,new_attr_name,child)
 		adopting_parent.opc_children.sort()
 		return adopting_parent
 		
@@ -205,8 +240,9 @@ class Generic(object):
 		for child in children:
 			if not filter_func is None:
 				if not filter_func(child): continue
-			adopting_parent.opc_children.append(child.opc_path.replace('.','_'))
-			setattr(adopting_parent,child.opc_path.replace('.','_'),child)
+			new_attr_name = approve_name_and_register_guid(adopting_parent, child, child.opc_path.replace('.', '_'))
+			adopting_parent.opc_children.append(new_attr_name)
+			setattr(adopting_parent,new_attr_name,child)
 		adopting_parent.opc_children.sort()
 		return adopting_parent
 
@@ -320,8 +356,8 @@ class Generic(object):
 		tags_write_data = []
 		try:
 			tags_write_data = [((obj.opc_path, value), obj.idx_prop[1], obj.idx_prop[5]) for obj in obj_to_write]
-		except:
-			Exception('You have to read the properties of the values before trying to writing them')
+		except AttributeError:
+			raise Exception('You have to read the properties of the values before trying to writing them')
 
 		path_value = []
 		for tags_to_write, data_type, access_right in tags_write_data:
@@ -330,20 +366,20 @@ class Generic(object):
 					print("You don't have access right to Read/Write " + str(tags_to_write[0]) + " item is ignored.")
 					continue
 				else:
-					Exception("You don't have access right to Read/Write " + str(tags_to_write[0]))
+					raise Exception("You don't have access right to Read/Write " + str(tags_to_write[0]))
 			if not check_write_type(value, data_type):
 				if accept_fails:
 					print("Value is of wrong data type " + str(tags_to_write[0]) + " is of type " + str(type(value)) + " while the tag is canonical type: " + str(data_type))
 					continue
 				else:
-					Exception("Value is of wrong data type " + str(tags_to_write[0]) + " is of type " + str(
+					raise Exception("Value is of wrong data type " + str(tags_to_write[0]) + " is of type " + str(
 						type(value)) + " while the tag is canonical type: " + str(data_type))
 			path_value.append(tags_to_write)
 		i = 0
 		print("Write " + str(i).rjust(8) + " of " +str(len(path_value)).rjust(8) + " items", end="\r")
 		while len(path_value) > i:
 			try:
-				loc_res = opc_cli.write(path_value[i:i+max_chunk])
+				opc_cli.write(path_value[i:i+max_chunk])
 				print("Write " + str(i).rjust(8) + " of " +str(len(path_value)).rjust(8) + " items", end="\r")
 			except Exception:
 				raise Exception("Couldn't write values to: " + str(path_value[i:max_chunk]))
@@ -361,8 +397,8 @@ class Generic(object):
 		tags_write_data = []
 		try:
 			tags_write_data = [((obj.opc_path, obj.value), obj.idx_prop[1], obj.idx_prop[5]) for obj in obj_to_write]
-		except:
-			Exception('You have to read the properties of the values before trying to writing them')
+		except AttributeError:
+			raise Exception('You have to read the properties of the values before trying to writing them')
 		path_value = []
 		for data_to_write, data_type, access_right in tags_write_data:
 			if access_right != 'Read/Write':
@@ -370,20 +406,20 @@ class Generic(object):
 					print("You don't have access right to Read/Write " + str(data_to_write[0]) + " item is ignored.")
 					continue
 				else:
-					Exception("You don't have access right to Read/Write " + str(data_to_write[0]))
+					raise Exception("You don't have access right to Read/Write " + str(data_to_write[0]))
 			if not check_write_type(data_to_write[1], data_type):
 				if accept_fails:
 					print("Value is of wrong data type " + str(data_to_write[0]) + " is of type " + str(type(data_to_write[1])) + " while the tag is canonical type: " + str(data_type))
 					continue
 				else:
-					Exception("Value is of wrong data type " + str(data_to_write[0]) + " is of type " + str(
+					raise Exception("Value is of wrong data type " + str(data_to_write[0]) + " is of type " + str(
 						type(data_to_write[1])) + " while the tag is canonical type: " + str(data_type))
 			path_value.append(data_to_write)
 		i = 0
 		print("Write " + str(i).rjust(8) + " of " +str(len(path_value)).rjust(8) + " items", end="\r")
 		while len(path_value) > i:
 			try:
-				loc_res = opc_cli.write(path_value[i:i+max_chunk])
+				opc_cli.write(path_value[i:i+max_chunk])
 				print("Write " + str(i).rjust(8) + " of " +str(len(path_value)).rjust(8) + " items", end="\r")
 			except Exception:
 				raise Exception("Couldn't write values to: " + str(path_value[i:max_chunk]))
@@ -412,8 +448,10 @@ class Generic(object):
 				obj = getattr(parent_with_all, item.replace('.', '_'))
 				if obj.value != value or print_all:
 					print(str(value).ljust(30) + str(obj.value).ljust(30) + obj.opc_path)
-					adopting_parent.opc_children.append(obj.opc_path.replace('.', '_'))
-					setattr(adopting_parent, obj.opc_path.replace('.', '_'), obj)
+					new_attr_name = approve_name_and_register_guid(adopting_parent, obj,
+																   obj.opc_path.replace('.', '_'))
+					adopting_parent.opc_children.append(new_attr_name)
+					setattr(adopting_parent, new_attr_name, obj)
 			i += max_chunk
 		return adopting_parent
 
@@ -423,8 +461,9 @@ class PlasticParent(Generic):
 	def combine_parent(self, other_parent):
 		for new_child in [getattr(other_parent,child) for child in other_parent.opc_children]:
 			if new_child.opc_path.replace('.','_') in self.opc_children: continue
-			self.opc_children.append(new_child.opc_path.replace('.','_'))
-			setattr(self,new_child.opc_path.replace('.','_'),new_child)
+			new_attr_name = approve_name_and_register_guid(self, new_child, new_child.opc_path.replace('.', '_'))
+			self.opc_children.append(new_attr_name)
+			setattr(self,new_attr_name,new_child)
 
 	def print_values(self):
 		for child in [getattr(self,path) for path in self.opc_children if not hasattr(getattr(self,path),'opc_children')]:

@@ -2,14 +2,20 @@
 from __future__ import print_function
 import os, sys, inspect, re, settings
 from importlib import reload, import_module
+from inspect import isfunction
+from typing import Self, Callable, TypeVar
 import opc_vars
 
 global opc_client
 global guid_registry
 
-def is_type_of(first,second,or_inherited=True):
+tGeneric = TypeVar('tGeneric', bound='Generic')
+tPlasticParent = TypeVar('tPlasticParent', bound='PlasticParent')
+
+def is_type_of(first,second,or_inherited=True) -> bool:
 	"""Compare if first is instance of second
-	with no regards of reloads"""
+	with no regards of reloads
+	"""
 	if str(first.__class__) == str(second.__class__):
 		return True
 	elif or_inherited:
@@ -18,7 +24,14 @@ def is_type_of(first,second,or_inherited=True):
 				return True
 	return False
 
-def check_write_type(value_to_write, canonical_data_type):
+def check_write_type(value_to_write, canonical_data_type: int) -> bool:
+	""" Checking the type of value_to_write compared to the OPC Canonical data type
+	according to https://support.softwaretoolbox.com/app/answers/detail/a_id/3849/~/opc-canonical-data-types
+
+	:value_to_write: The value that is prepared for writing with the OPC client
+	:canonical_data_type: A number that translate to a OPC datatype
+	:return: Boolean answering if write is possible to the type
+	"""
 	if type(value_to_write) is bool and canonical_data_type == 11:
 		"Bool"
 		return True
@@ -29,7 +42,7 @@ def check_write_type(value_to_write, canonical_data_type):
 		"Short/Int or Char"
 		return True
 	if type(value_to_write) is int and 0 <= value_to_write < 2**16 and canonical_data_type == 18:
-		"Word/Unit"
+		"Word/Unit possible BCD"
 		return True
 	if type(value_to_write) is int and 0 <= value_to_write < 2**32 and canonical_data_type == 19:
 		"DWord/DUint"
@@ -46,15 +59,31 @@ def check_write_type(value_to_write, canonical_data_type):
 	if type(value_to_write) is str and canonical_data_type == 8:
 		"String"
 		return True
+	if canonical_data_type > 8000:
+		raise NotImplemented("The possibility to write to Arrays isn't implemented.")
 	return False
 
-def bcd_to_int(n):
+def bcd_to_int(n: int) -> int:
+	"""Converts a binary-coded decimal to a int value
+	:n: The BCD value to convert to int
+	:return: The int value result
+	"""
 	return int(('%x' % n), base=10)
 
-def int_to_bcd(n):
+def int_to_bcd(n: int) -> int:
+	"""Converts a int value to binary-coded decimal value
+		:n: The int value to convert to BCD
+		:return: The BCD value result
+		"""
 	return int(str(n), base=16)
 
-def approve_opc_child_name(obj, item_name):
+def approve_opc_child_name(obj: tGeneric, item_name:str) -> str:
+	"""Transforms the item_name to a string that can be used as an attribute name for obj. If the name already is used
+	as an attribute name for the object is an underscore _ added to the name.
+	:obj: The object that should get the new item_name as attribute
+	:item_name: Name of item that should become an attribute
+	:return: approved attribute name
+	"""
 	item_name = re.sub('[^0-9a-zA-Z_]+', '', item_name)
 	if item_name[0].isnumeric(): item_name = '_' + item_name
 	if hasattr(obj, item_name):
@@ -66,7 +95,15 @@ def approve_opc_child_name(obj, item_name):
 			item_name = approve_opc_child_name(obj, '_' + item_name)
 	return item_name
 
-def approve_name_and_register_guid(parent, obj, item_name):
+def approve_name_and_register_guid(parent: tGeneric, obj: tGeneric, item_name: str) -> str:
+	"""Checks if the name can be used as attribute
+	If there is a uuid in the name is it removed and
+	registered in the global guid_registry, pointing
+	to the child. It the inputted name is ok then is
+	that return otherwise is an underscore added in
+	the beginning.
+	:Return: An approved name
+	"""
 	find_result = re.findall('[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-5][0-9a-fA-F]{3}-[089ab][0-9a-fA-F]{3}-[0-9a-fA-F]{12}', item_name)
 	if len(find_result) == 0:
 		return approve_opc_child_name(parent, item_name)
@@ -82,8 +119,8 @@ def approve_name_and_register_guid(parent, obj, item_name):
 class Generic(object):
 	opc_path = None
 	opc_children = []
-	
-	def __init__(self,opc_path,predecessor=None):
+
+	def __init__(self,opc_path: str,predecessor: tGeneric=None):
 		self.opc_children = []
 		self.opc_path = opc_path
 		if not predecessor is None:
@@ -96,8 +133,14 @@ class Generic(object):
 					print('\t+ Upgraded:' + str(new_child) + '\t\t\t\t', end="\r")
 				else:
 					setattr(self,attribute,getattr(predecessor,attribute))
-					
-	def upgrade(self):
+
+	def upgrade(self) -> Self:
+		"""Reload libraries and upgrade node
+		The module reloads the libraries'
+		version and upgrades the node and
+		all dependents.
+		:return: The upgraded version
+		"""
 		reload(sys.modules['opc_obj'])
 		reload(sys.modules['opc_vars'])
 		reload(sys.modules[self.__class__.__module__])
@@ -107,11 +150,11 @@ class Generic(object):
 			setattr(new_self,attribute,getattr(new_self,attribute).upgrade())
 		self.__dict__.update(new_self.__dict__)
 		return new_self
-				
-	def test(self):
+
+	def test(self) -> None:
 		print('Test7')
-				
-	def load_children(self, levels=-1, opc_cli=None, counter=None):
+
+	def load_children(self, levels: int=-1, opc_cli=None, counter: int=None) -> Self:
 		global opc_client
 		if not 'opc_client' in globals():
 			opc_client = opc_cli
@@ -130,9 +173,8 @@ class Generic(object):
 				setattr(self, item_name, child)
 				self.opc_children.append(item_name)
 			elif self.opc_path in item:
-				# variable_properties = None
-				# variable_properties = opc_cli.properties(item)
 				variable_properties = None
+				# variable_properties = opc_cli.properties(item)
 				# setattr(self,item.rsplit('.',1)[1],variable_properties)
 				child = self._create_variable(item,variable_properties)
 				var_name = item.rsplit('.',1)[1]
@@ -152,10 +194,10 @@ class Generic(object):
 			return self
 		return self, internal_counter
 
-	def _create_variable(self, opc_path, variable_properties):
+	def _create_variable(self, opc_path: str, variable_properties: str) -> opc_vars.OpcVariable:
 		return opc_vars.OpcVariable(opc_path, opc_properties=variable_properties)
 
-	def transform(self, diag=False):
+	def transform(self, diag=False) -> Self:
 		import opc_class_lib
 		reload(opc_class_lib)
 		for lib in opc_class_lib.__all__:
@@ -164,7 +206,7 @@ class Generic(object):
 			reload(module)
 		return self._transform(diag)
 
-	def _transform(self,diag=False):
+	def _transform(self,diag=False) -> Self:
 		for child in self.opc_children:
 			setattr(self,child,getattr(self,child)._transform(diag))
 		# print('Loaded modules: ' + str(sys.modules))
@@ -180,8 +222,8 @@ class Generic(object):
 				self.__dict__.update(new_self.__dict__)
 				return new_self
 		return self
-		
-	def compare_identity(self,other,diag=False):
+
+	def compare_identity(self,other: tGeneric,diag=False) -> bool:
 		# if [x for x in self.opc_children if x.title() != 'Dummy'] != [x for x in other.opc_children if x.title() != 'Dummy']:
 		# 	return False
 		if diag:
@@ -196,16 +238,16 @@ class Generic(object):
 			except AttributeError:
 				return False
 		return True
-		
-	def all_of_class_as_set(self,re_class):
+
+	def all_of_class_as_set(self,re_class: str) -> set:
 		result = set()
 		for attribute in self.opc_children:
 			result.update(getattr(self,attribute).all_of_class_as_set(re_class))
 		if not re.search(re_class,str(self.__class__.__name__)) is None:
 			result.add(self)
 		return result
-		
-	def _all_of_class(self, re_class, filter_func=None):
+
+	def _all_of_class(self, re_class: str, filter_func=None) -> tPlasticParent:
 		children = self.all_of_class_as_set(re_class)
 		adopting_parent = PlasticParent('Adopting parent')
 		for child in children:
@@ -216,25 +258,20 @@ class Generic(object):
 			setattr(adopting_parent,new_attr_name,child)
 		adopting_parent.opc_children.sort()
 		return adopting_parent
-		
-	def all_with_path_as_set(self, re_path):
+
+	def all_with_path_as_set(self, re_path: str) -> set:
 		result = set()
 		for child_path in self.opc_children:
 			result.update(getattr(self,child_path).all_with_path_as_set(re_path))
-		try:
-			if not re.search(re_path,self.opc_path) is None:
-				result.add(self)
-		except TypeError:
-			print('Pattern')
-			print(re_path)
-			print('self.opc_path')
-			print(self.opc_path)
-			print(self.opc_children)
-			print(self.__class__)
-			raise TypeError
+		if self.opc_path is None:
+			pass
+		elif re_path is None:
+			result.add(self)
+		elif not re.search(re_path,self.opc_path) is None:
+			result.add(self)
 		return result
-		
-	def _all_with_path(self, re_path, filter_func=None):
+
+	def _all_with_path(self, re_path: str, filter_func: Callable[[tGeneric],bool]=None) -> tPlasticParent:
 		children = self.all_with_path_as_set(re_path)
 		adopting_parent = PlasticParent('Adopting parent')
 		for child in children:
@@ -246,27 +283,32 @@ class Generic(object):
 		adopting_parent.opc_children.sort()
 		return adopting_parent
 
-	def _all_that_pass_filter(self,filter_func):
-		pass
-		
-	def all(self,re_path=None,re_class=None, filter_func=None):
+	def all(self,re_path: str=None,re_class: str=None, filter_func: Callable[[tGeneric],bool]=None) -> tPlasticParent:
 		"""Returns all children with matching opc-path and class
 		observe that the opc-path has dots '.' as separator between
 		parent and child
 		
 		Keywords:
-		re_path: The regular expression string that should be matched against the opc-path
-		re_class: The regular expression string that should be matched against the class of the item
+		:re_path: The regular expression string that should be matched against the opc-path
+		:re_class: The regular expression string that should be matched against the class of the item
+		:filter_func: A custom filter like the ones in example_filters.py
+		:return: An Adopting parent with all the filtered objects as children on first level
 		"""
+		if not isinstance(re_path, str):
+			raise TypeError("re_path is of type " +str(type(re_path)) + " it should be a regex-string")
+		if not isinstance(re_class, str):
+			raise TypeError("re_class is of type " +str(type(re_path)) + " it should be a regex-string")
+		if not isfunction(filter_func):
+			raise TypeError("filter is of type " +str(type(filter_func)) + " it should be a function")
 		if (re_class is None) and (re_path is None):
-			return self._all_with_path('', filter_func)
+			return self._all_with_path(re_path='', filter_func=filter_func)
 		if re_class is None:
-			return self._all_with_path(re_path, filter_func)
+			return self._all_with_path(re_path, filter_func=filter_func)
 		if re_path is None:
-			return self._all_of_class(re_class, filter_func)
-		return self._all_with_path(re_path, filter_func)._all_of_class(re_class)
-		
-	def all_as_list(self,re_path=None,re_class=None, branches=True, filter_func=None):
+			return self._all_of_class(re_class, filter_func=filter_func)
+		return self._all_with_path(re_path, filter_func=filter_func)._all_of_class(re_class)
+
+	def all_as_list(self,re_path=None,re_class=None, branches=True, filter_func=None) -> list:
 		adopting_parent = self.all(re_path,re_class,filter_func)
 		if branches:
 			return [getattr(adopting_parent,child_path) for child_path in adopting_parent.opc_children]
@@ -274,32 +316,63 @@ class Generic(object):
 			return [getattr(adopting_parent,child_path) for child_path in adopting_parent.opc_children
 					if not hasattr(getattr(adopting_parent,child_path),'opc_children')]
 
-	def save(self, file_name=None):
+	def save(self, file_name: str=None) -> None:
 		import pickle
 		file_path = settings.OPC_OBJ_PICKLE if file_name is None else settings.WORKING_DIR + file_name + '.pickle'
 		with open(file_path, 'wb') as pickle_file:
 			pickle.dump(self,pickle_file)
 
-	def restore(self, file_name=None):
+	def restore(self, file_name=None) -> None:
 		import pickle
 		file_path = settings.OPC_OBJ_PICKLE if file_name is None else settings.WORKING_DIR + file_name + '.pickle'
 		with open(file_path, 'rb') as pickle_file:
 			return pickle.load(pickle_file)
 
-	def first_read(self, opc_cli=None, max_chunk=40):
+	def rename_child(self, name_now: str ,new_name: str) -> Self:
+		"""Rename a child with new OPC name
+		Changing the opc_path for all children below. Use in connection with
+		renaming in the PLC.
+		:name_now: The old name
+		:new_name: The new name
+		:return: self
+		"""
+		if not name_now in self.opc_children:
+			raise Exception("There's no child with the given name_now: " + str(name_now))
+		child_to_rename = getattr(self, name_now)
+		new_approved_name = approve_name_and_register_guid(self, child_to_rename, new_name)
+		if new_approved_name != new_name:
+			raise Exception("Proposed new name isn't appropriate, you can try: " + new_approved_name)
+		self.opc_children.append(new_approved_name)
+		self.opc_children.remove(name_now)
+		delattr(self, name_now)
+		setattr(self,new_approved_name, child_to_rename)
+		child_to_rename._rename_in_opc_path(new_approved_name, level=0)
+		return self
+
+	def _rename_in_opc_path(self, new_name: str, level: int=0) -> Self:
+		split_path = self.opc_path.split('.')
+		split_path[level-1] = new_name
+		self.opc_path = '.'.join(split_path)
+		for child_name in self.opc_children:
+			getattr(self,child_name)._rename_in_opc_path(new_name, level=level-1)
+		return self
+
+	def first_read(self, opc_cli=None, max_chunk=40) -> Self:
 		global opc_client
 		if opc_cli is None:
 			opc_cli = opc_client
 		parent_with_all = self.all()
 		obj_to_read = [getattr(parent_with_all,child_path) for child_path in parent_with_all.opc_children
-					if not ((hasattr(getattr(parent_with_all,child_path),'opc_children')) or (hasattr(getattr(parent_with_all,child_path),'name_prop')))]
+					if not ((hasattr(getattr(parent_with_all,child_path),'opc_children'))
+							or (hasattr(getattr(parent_with_all,child_path),'name_prop')))]
 		tags_to_read = [obj.opc_path for obj in obj_to_read]
 		i = 0
 		print("Read properties " + str(i).rjust(8) + " of " +str(len(tags_to_read)).rjust(8) + " items", end="\r")
 		while len(tags_to_read) > i:
 			try:
 				loc_res = opc_cli.properties(tags_to_read[i:i+max_chunk])
-				print("Read properties " + str(i).rjust(8) + " of " +str(len(tags_to_read)).rjust(8) + " items", end="\r")
+				print("Read properties " + str(i).rjust(8) + " of "
+					  +str(len(tags_to_read)).rjust(8) + " items", end="\r")
 			except Exception:
 				raise Exception("Couldn't read properties from: " + str(tags_to_read[i:i+max_chunk]))
 			for (item, PropertyId,PropertyName,PropertyValue) in loc_res:
@@ -313,10 +386,11 @@ class Generic(object):
 				if PropertyName == 'Item Value':
 					obj.value = PropertyValue
 			i += max_chunk
-		print("Read properties " + str(min(i,len(tags_to_read))).rjust(8) + " of " +str(len(tags_to_read)).ljust(8) + " items")
+		print("Read properties " + str(min(i,len(tags_to_read))).rjust(8)
+			  + " of " +str(len(tags_to_read)).ljust(8) + " items")
 		return self
 
-	def read(self, opc_cli=None, max_chunk=1000, log=True):
+	def read(self, opc_cli=None, max_chunk=1000, log: bool=True) -> Self:
 		global opc_client
 		if opc_cli is None:
 			opc_cli = opc_client
@@ -342,11 +416,12 @@ class Generic(object):
 		print("Read " + str(min(i,len(tags_to_read))).rjust(8) + " of " +str(len(tags_to_read)).ljust(8) + " items")
 		return self
 
-	def clear_logs(self):
+	def clear_logs(self) -> Self:
 		for obj in self.all_as_list(branches=False):
 			obj.log = []
+		return self
 
-	def write_one_value(self, value, opc_cli=None, max_chunk=20, accept_fails=False):
+	def write_one_value(self, value, opc_cli=None, max_chunk: int=20, accept_fails: bool=False) -> Self:
 		global opc_client
 		if opc_cli is None:
 			opc_cli = opc_client
@@ -369,7 +444,8 @@ class Generic(object):
 					raise Exception("You don't have access right to Read/Write " + str(tags_to_write[0]))
 			if not check_write_type(value, data_type):
 				if accept_fails:
-					print("Value is of wrong data type " + str(tags_to_write[0]) + " is of type " + str(type(value)) + " while the tag is canonical type: " + str(data_type))
+					print("Value is of wrong data type " + str(tags_to_write[0]) + " is of type "
+						  + str(type(value)) + " while the tag is canonical type: " + str(data_type))
 					continue
 				else:
 					raise Exception("Value is of wrong data type " + str(tags_to_write[0]) + " is of type " + str(
@@ -387,14 +463,13 @@ class Generic(object):
 		print("Write " + str(min(i,len(path_value))).rjust(8) + " of " +str(len(path_value)).rjust(8) + " items")
 		return self
 
-	def write(self, opc_cli=None, max_chunk=20, accept_fails=False):
+	def write(self, opc_cli=None, max_chunk: int=20, accept_fails: bool=False) -> Self:
 		global opc_client
 		if opc_cli is None:
 			opc_cli = opc_client
 		parent_with_all = self.all()
 		obj_to_write = [getattr(parent_with_all,child_path) for child_path in parent_with_all.opc_children
 					if not hasattr(getattr(parent_with_all,child_path),'opc_children')]
-		tags_write_data = []
 		try:
 			tags_write_data = [((obj.opc_path, obj.value), obj.idx_prop[1], obj.idx_prop[5]) for obj in obj_to_write]
 		except AttributeError:
@@ -409,7 +484,8 @@ class Generic(object):
 					raise Exception("You don't have access right to Read/Write " + str(data_to_write[0]))
 			if not check_write_type(data_to_write[1], data_type):
 				if accept_fails:
-					print("Value is of wrong data type " + str(data_to_write[0]) + " is of type " + str(type(data_to_write[1])) + " while the tag is canonical type: " + str(data_type))
+					print("Value is of wrong data type " + str(data_to_write[0]) + " is of type "
+						  + str(type(data_to_write[1])) + " while the tag is canonical type: " + str(data_type))
 					continue
 				else:
 					raise Exception("Value is of wrong data type " + str(data_to_write[0]) + " is of type " + str(
@@ -427,7 +503,7 @@ class Generic(object):
 		print("Write " + str(min(i,len(path_value))).rjust(8) + " of " +str(len(path_value)).rjust(8) + " items")
 		return self
 
-	def changed(self, opc_cli=None, print_all=False, max_chunk=200):
+	def changed(self, opc_cli=None, print_all: bool=False, max_chunk: int=200) -> tPlasticParent:
 		global opc_client
 		if opc_cli is None:
 			opc_cli = opc_client
@@ -458,13 +534,20 @@ class Generic(object):
 
 class PlasticParent(Generic):
 
-	def combine_parent(self, other_parent):
+	def combine_parent(self, other_parent: tGeneric):
 		for new_child in [getattr(other_parent,child) for child in other_parent.opc_children]:
 			if new_child.opc_path.replace('.','_') in self.opc_children: continue
 			new_attr_name = approve_name_and_register_guid(self, new_child, new_child.opc_path.replace('.', '_'))
 			self.opc_children.append(new_attr_name)
 			setattr(self,new_attr_name,new_child)
 
-	def print_values(self):
+	def print_values(self) -> None:
+		"""Print child.value for all children on parent
+		:return: None
+		"""
 		for child in [getattr(self,path) for path in self.opc_children if not hasattr(getattr(self,path),'opc_children')]:
-			print(str(child.value).ljust(15) + child.opc_path)
+			try:
+				print(str(child.value).ljust(15) + child.opc_path)
+			except AttributeError:
+				print("Child.value is missing - You need to read the values before you can print them")
+				break

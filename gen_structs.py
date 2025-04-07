@@ -1,11 +1,14 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-from __future__ import with_statement
+import re
 from openpyxl import load_workbook
 from collections import OrderedDict
 from os import listdir
+from opc_obj import Generic, approve_name_and_register_guid
+import opc_vars
 
-def make_py_file(workbook, lib_name, lib_dict):
+
+def make_lib_file(workbook, lib_name:str, lib_dict:dict):
 	output = "#!/usr/bin/env python\n# -*- encoding: utf-8 -*-\n"
 	output += "import opc_obj"
 	for lib in list(set(lib_dict.values())):
@@ -62,7 +65,7 @@ class Gen_OPC_Obj(opc_obj.Generic):
 				print("Unknown type: " + child_class_name)
 				print("At creation of: " + sheet_name)
 				exit()
-			
+
 			opc_children.append(attribute_name)
 			if child_lib_name == lib_name:
 				output += "\n\t\t\tself." + attribute_name + " = " + child_class_name
@@ -88,7 +91,7 @@ class Gen_OPC_Obj(opc_obj.Generic):
 			# 	output += ", sig_range=sig_range"
 
 			output += ")"
-				
+
 		output += "\n\t\t\tself.opc_children = " + str(opc_children)
 		output += """		
 		else:
@@ -107,6 +110,69 @@ def update_init_file():
 		new_string = new_string[:-1] + "]"
 		initFile.write(new_string)
 
+def create_from_StartValuesData():
+	"""Function to read data from ABB 800M
+	Start Value Analyzer files. The init-value
+	is put in a .init_value"""
+	dir_path = listdir('Input')
+	start_value_folder_paths = ['Input\\' + folder_name for folder_name in dir_path if 'StartValuesData' in folder_name]
+	if len(start_value_folder_paths) == 0:
+		raise Exception("No folder name containing 'StartValuesData' in 'Input' folder")
+	if len(start_value_folder_paths) == 1:
+		print("Only one folder available '" + start_value_folder_paths[0] + "'.")
+		print("Selected '" + start_value_folder_paths[0] + "' to read from.")
+		file_paths = [start_value_folder_paths[0] + '\\' + file_path for file_path in listdir(start_value_folder_paths[0])]
+	else:
+		for idx, name in enumerate(start_value_folder_paths):
+			print(str(idx + 1).ljust(5) + name)
+		idx = -1
+		while not 0 <= int(idx) < len(start_value_folder_paths):
+			idx = input("Chose a folder-server to read from [1-" + str(len(start_value_folder_paths)) + "] input 'a' to abort:")
+			if idx == r'a':
+				raise Exception('User aborted')
+			idx = int(idx)-1
+		print("Selected '" + start_value_folder_paths[idx] + "' to read from.")
+		file_paths = [start_value_folder_paths[idx] + '\\' + file_path for file_path in listdir(start_value_folder_paths[idx])]
+	pattern = re.compile(r"^(.*?)\t(.*?)\t(.*?)\t(.*?)\t(.*?)$")
+	root = Generic(None)
+	for file_path in file_paths:
+		if 'SessionLog' in file_path: continue
+		with open(file_path,'r') as file:
+			next(file) #Skipping the first row
+			for line in file:
+				match = pattern.match(line)
+				if match:
+					path, init_value, live_value, quality, value_type = match.groups()
+					pos = root
+					part_path = ''
+					for part in path.split('.')[:-1]:
+						part_path += '.' + part
+						attr_name = approve_name_and_register_guid(pos, None, item_name=part)
+						if hasattr(pos, attr_name):
+							pos = getattr(pos, attr_name)
+						else:
+							new_child = Generic(part_path[1:])
+							pos.opc_children.append(attr_name)
+							setattr(pos, attr_name, Generic(part_path[1:]))
+							pos = new_child
+					attr_name = approve_name_and_register_guid(pos,None,item_name=path.split('.')[-1])
+					if hasattr(pos,attr_name):
+						leaf = getattr(pos,attr_name)
+					else:
+						leaf = opc_vars.OpcVariable(path)
+						leaf.name_prop = {'Item Type Name': value_type}
+						leaf._transform()
+						leaf.value = live_value
+						leaf.init_value = init_value
+						pos.opc_children.append(attr_name)
+						setattr(pos, attr_name, leaf)
+					if 'CRValues' in file_path:
+						leaf.idx_prop = {5002:'ColdRetain'}
+					elif 'RValues' in file_path:
+						leaf.idx_prop = {5002: 'Retain'}
+	return root
+
+
 if __name__ == "__main__":
 	lib_dict = {'Real':'opc_vars','Bool':'opc_vars','Time':'opc_vars','Uint':'opc_vars','Dint':'opc_vars','Dword':'opc_vars','Word':'opc_vars','Date_And_Time':'opc_vars','String':'opc_vars'}
 	lib_and_file_to_create = OrderedDict()
@@ -114,13 +180,13 @@ if __name__ == "__main__":
 	lib_and_file_to_create['opc_class_lib.BasicLib_1_8_5'] = 'input\\BasicLib_1_8_5.xlsx'
 	for new_lib_name, from_file in lib_and_file_to_create.items():
 		wb = load_workbook(filename=from_file, read_only=True)
-		output, lib_dict = make_py_file(wb,new_lib_name,lib_dict)
+		output, lib_dict = make_lib_file(wb,new_lib_name,lib_dict)
 		with open(new_lib_name.replace('.','\\') +".py",'w', encoding='utf-8') as outputFile:
 			outputFile.write(output)
 	update_init_file()
-		
+
 	# wb = load_workbook(filename='input\\MA_SJRA_AA_ObjLib_0_1.xlsx', read_only=True)
 	# new_lib_name = 'ma_sjra_aa_objlib_0_1'
-	# output, lib_dict = make_py_file(wb,new_lib_name,lib_dict)			
+	# output, lib_dict = make_py_file(wb,new_lib_name,lib_dict)
 	# with open('opc_class_lib\\' + new_lib_name + ".py",'w') as outputFile:
 		# outputFile.write(output)

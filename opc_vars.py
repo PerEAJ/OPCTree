@@ -1,6 +1,7 @@
 import sys, re
 from importlib import reload
 
+
 class OpcVariable(object):
 	opc_path = None
 	
@@ -23,7 +24,7 @@ class OpcVariable(object):
 		self.__dict__.update(new_self.__dict__)
 		return new_self
 		
-	def _transform(self, diag=False):
+	def _transform(self):
 		if not hasattr(self, 'name_prop'):
 			return self
 		elif self.name_prop['Item Type Name'] == u'bool':
@@ -47,6 +48,12 @@ class OpcVariable(object):
 		elif self.name_prop['Item Type Name'] == u'dword':
 			return Dword(opc_path=self.opc_path, predecessor=self)
 		return self
+
+	def _rename_in_opc_path(self, new_name: str, level: int):
+		split_path = self.opc_path.split('.')
+		split_path[level-1] = new_name
+		self.opc_path = '.'.join(split_path)
+		return self
 		
 	def all_of_class_as_set(self,re_class):
 		if not re.search(re_class,str(self.__class__.__name__)) is None:
@@ -54,8 +61,14 @@ class OpcVariable(object):
 		return set()
 		
 	def all_with_path_as_set(self,re_path):
-		if not re.search(re_path,self.opc_path) is None:
+		if re_path is None:
 			return set([self])
+		try:
+			if not re.search(re_path,self.opc_path) is None:
+				return set([self])
+		except TypeError:
+			print("re_path: " + str(re_path) + " , self.opc_path: " + str(self.opc_path))
+			raise TypeError
 		return set()
 		
 class AnalogVar(OpcVariable):

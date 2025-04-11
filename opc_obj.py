@@ -1,10 +1,12 @@
 # encoding: utf-8
 from __future__ import print_function
 import os, sys, inspect, re, settings
+import typing
 from importlib import reload, import_module
 from inspect import isfunction
 from typing import Self, Callable, TypeVar
 import opc_vars
+from opc_vars import OpcVariable
 
 global opc_client
 global guid_registry
@@ -95,7 +97,7 @@ def approve_opc_child_name(obj: tGeneric, item_name:str) -> str:
 			item_name = approve_opc_child_name(obj, '_' + item_name)
 	return item_name
 
-def approve_name_and_register_guid(parent: tGeneric, obj: tGeneric, item_name: str) -> str:
+def approve_name_and_register_guid(parent: tGeneric, obj: typing.Optional[tGeneric,OpcVariable], item_name: str) -> str:
 	"""Checks if the name can be used as attribute
 	If there is a uuid in the name is it removed and
 	registered in the global guid_registry, pointing
@@ -120,7 +122,7 @@ class Generic(object):
 	opc_path = None
 	opc_children = []
 
-	def __init__(self,opc_path: str,predecessor: tGeneric=None):
+	def __init__(self,opc_path: typing.Optional[str],predecessor: tGeneric=None):
 		self.opc_children = []
 		self.opc_path = opc_path
 		if not predecessor is None:
@@ -194,7 +196,7 @@ class Generic(object):
 			return self
 		return self, internal_counter
 
-	def _create_variable(self, opc_path: str, variable_properties: str) -> opc_vars.OpcVariable:
+	def _create_variable(self, opc_path: str, variable_properties: typing.Optional[str]) -> opc_vars.OpcVariable:
 		return opc_vars.OpcVariable(opc_path, opc_properties=variable_properties)
 
 	def transform(self, diag=False) -> Self:
@@ -320,6 +322,7 @@ class Generic(object):
 		import pickle
 		file_path = settings.OPC_OBJ_PICKLE if file_name is None else settings.WORKING_DIR + file_name + '.pickle'
 		with open(file_path, 'wb') as pickle_file:
+			# noinspection PyTypeChecker
 			pickle.dump(self,pickle_file)
 
 	def restore(self, file_name=None) -> None:

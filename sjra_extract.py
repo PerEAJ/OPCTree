@@ -1,4 +1,4 @@
-import settings
+#import settings
 import opc_fetch
 import struct_identi
 from openpyxl import Workbook
@@ -21,4 +21,4 @@ for rowNbr in range(len(variables)):
 				
 wb.save("Output//FromOPC.xlsx")
 
-known_stucts = struct_identi.get_structure(variables)
+known_structs = struct_identi.get_structure(variables)

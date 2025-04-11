@@ -1,10 +1,14 @@
 from __future__ import print_function
 import json
+import typing
+
 import settings
 import OpenOPC
 import opc_obj
+from opc_obj import tGeneric
 
 global opc_client
+
 
 def initiate_opc_client():
 	global opc_client
@@ -31,7 +35,7 @@ def connect_and_build(levels = -1):
 	return opc_obj.Generic(settings.TOP_LEVEL).load_children(levels, opc_client)
 
 def load_existing():
-	return opc_obj.Generic(settings.TOP_LEVEL).restore()
+	return opc_obj.restore()
 
 def connect_and_extract_variables():
 	global nbr_loaded_vars
@@ -69,6 +73,9 @@ def save_vars(variables):
 	# data = with_alias(data)
 	with open(settings.VARS_FILE, 'w') as output_file:
 		output_file.write(data)
+
+def restore(file_name: typing.Optional[str]) -> tGeneric:
+	return opc_obj.restore(file_name)
 			
 if __name__ == "__main__":
 	# OPC_SERVER = 'ABB.AC800MC_OpcDaServer.3'

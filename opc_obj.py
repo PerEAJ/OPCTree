@@ -118,6 +118,14 @@ def approve_name_and_register_guid(parent: tGeneric, obj: typing.Optional[tGener
 		new_name = approve_opc_child_name(parent, item_name)
 		return new_name
 
+
+def restore(file_name=None) -> None:
+	import pickle
+	file_path = settings.OPC_OBJ_PICKLE if file_name is None else settings.WORKING_DIR + file_name + '.pickle'
+	with open(file_path, 'rb') as pickle_file:
+		return pickle.load(pickle_file)
+
+
 class Generic(object):
 	opc_path = None
 	opc_children = []
@@ -324,12 +332,6 @@ class Generic(object):
 		with open(file_path, 'wb') as pickle_file:
 			# noinspection PyTypeChecker
 			pickle.dump(self,pickle_file)
-
-	def restore(self, file_name=None) -> None:
-		import pickle
-		file_path = settings.OPC_OBJ_PICKLE if file_name is None else settings.WORKING_DIR + file_name + '.pickle'
-		with open(file_path, 'rb') as pickle_file:
-			return pickle.load(pickle_file)
 
 	def rename_child(self, name_now: str ,new_name: str) -> Self:
 		"""Rename a child with new OPC name

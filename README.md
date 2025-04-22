@@ -56,7 +56,7 @@ If you want to load more children to a part of the tree, use
 If you want to reload items to a structure that already is loaded then you can use
 ````reload_children()````. This will keep the already loaded items, but delete the
 items that no longer is in the OPC-server. If you are on the level that has changed
-items and you don't want to search through the hole subtree for changes, then can you
+items, and you don't want to search through the hole subtree for changes, then can you
 use ````reload_children(ignore_existing=True)````, that will only load the subtrees
 that isn't in the current object and remove the ones that no longer is in the OPC-server.
 
@@ -118,7 +118,7 @@ or if you want to filter out the objects GP001 to GP005
 >>>temp_parent = root.all(r'App1\.Diagram2\.H20\.GP00[1-5]')
 ````
 
-A easy way of testing if your regular expression matched the paths that you
+An easy way of testing if your regular expression matched the paths that you
 wanted is to print some of the matches with ``.print_paths(<count to print>)`` like this:
 ````
 >>>root.all(r'App1\.Diagram2\.H20\.GP00[1-5]').print_paths(10)

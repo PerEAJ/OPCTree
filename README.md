@@ -1,4 +1,4 @@
-# pyOPC - A Python OPC browser
+# pyOPC - For efficient CLI maneuvers of OPC DA structures
 
 This packaged is made for simplifying working with OPC data from the
 Python CLI. It enables easy scan of a nested structure, searching
@@ -11,7 +11,7 @@ the user wants to work on.
 
 ## Notation
 A OPC "tree" is built upon branches, i.e. data structs and "leaves", i.e.
-OPC variables. The branches can have other branches as well as leaves within
+OPC variables. The branches can have other branches as well as leaves on
 them. The branches and the leaves within a struct are called children to the
 parent node, i.e. the data struct. Children can be transferred to another temporary
 parent node, that parent node is then referred to as the "plastic parent" of

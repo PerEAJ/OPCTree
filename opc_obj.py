@@ -5,14 +5,15 @@ import typing
 from importlib import reload, import_module
 from inspect import isfunction
 from typing import Self, Callable, TypeVar
+
 import opc_vars
-from opc_vars import OpcVariable
 
 global opc_client
 global guid_registry
 
 tGeneric = TypeVar('tGeneric', bound='Generic')
 tPlasticParent = TypeVar('tPlasticParent', bound='PlasticParent')
+tOpcVariable = TypeVar('tOpcVariable', bound='opc_vars.OpcVariable')
 
 def is_type_of(first,second,or_inherited=True) -> bool:
 	"""Compare if first is instance of second
@@ -73,7 +74,7 @@ def bcd_to_int(n: int) -> int:
 	return int(('%x' % n), base=10)
 
 def int_to_bcd(n: int) -> int:
-	"""Converts a int value to binary-coded decimal value
+	"""Converts an int value to binary-coded decimal value
 		:n: The int value to convert to BCD
 		:return: The BCD value result
 		"""
@@ -93,13 +94,16 @@ def approve_opc_child_name(obj: tGeneric, item_name:str) -> str:
 			return item_name
 		elif isinstance(getattr(obj, item_name), opc_vars.OpcVariable):
 			return item_name
+		elif item_name in obj.opc_children:
+			# Item can fail check above if upgraded
+			return item_name
 		else:
 			item_name = approve_opc_child_name(obj, '_' + item_name)
 	return item_name
 
-def approve_name_and_register_guid(parent: tGeneric, obj: typing.Optional[tGeneric,OpcVariable], item_name: str) -> str:
+def approve_name_and_register_guid(parent: tGeneric, obj: typing.Optional[typing.Union[tGeneric,tOpcVariable]], item_name: str) -> str:
 	"""Checks if the name can be used as attribute
-	If there is a uuid in the name is it removed and
+	If there is an uuid in the name is it removed and
 	registered in the global guid_registry, pointing
 	to the child. It the inputted name is ok then is
 	that return otherwise is an underscore added in
@@ -148,7 +152,7 @@ class Generic(object):
 		"""Reload libraries and upgrade node
 		The module reloads the libraries'
 		version and upgrades the node and
-		all dependents.
+		all children.
 		:return: The upgraded version
 		"""
 		reload(sys.modules['opc_obj'])
@@ -172,6 +176,8 @@ class Generic(object):
 			opc_cli = opc_client
 		if levels == 0: return self if counter is None else self, counter
 		result = opc_cli.list(self.opc_path)
+		for old_child in self.opc_children:
+			delattr(self,old_child)
 		self.opc_children = []
 		if counter is None: internal_counter = 0
 		else: internal_counter = counter
@@ -196,6 +202,54 @@ class Generic(object):
 			else:
 				new_path = '.'.join([self.opc_path,item])
 				child, internal_counter = Generic(new_path).load_children(levels=levels-1,opc_cli=opc_cli,  counter=internal_counter)
+				item_name = approve_name_and_register_guid(self, child, item)
+				setattr(self,item_name,child)
+				self.opc_children.append(item_name)
+		if counter is None:
+			print()
+			return self
+		return self, internal_counter
+
+	def reload_children(self, levels: int=-1, opc_cli=None, counter: int=None, ignore_existing=False) -> Self:
+		global opc_client
+		if not 'opc_client' in globals():
+			opc_client = opc_cli
+		elif opc_cli is None:
+			opc_cli = opc_client
+		if levels == 0: return self if counter is None else self, counter
+		result = opc_cli.list(self.opc_path)
+		if counter is None:
+			internal_counter = 0
+		else:
+			internal_counter = counter
+		new_opc_children_names = [('.' + item_name).rsplit('.', 1)[1] for item_name in result]
+		for item_name in [old_child for old_child in self.opc_children if not old_child in new_opc_children_names]:
+			delattr(self,item_name)
+			self.opc_children.remove(item_name)
+		for item in result:
+			child_name = ('.' + item).rsplit('.', 1)[1]
+			if child_name in self.opc_children:
+				# Item loaded before
+				if ignore_existing or self.opc_path in item:
+					continue
+				child, internal_counter = getattr(self,child_name).reload_children(levels=levels-1,opc_cli=opc_cli,  counter=internal_counter)
+			elif self.opc_path is None:
+				new_path = item
+				child, internal_counter = Generic(new_path).reload_children(levels=levels-1,opc_cli=opc_cli,  counter=internal_counter)
+				item_name = approve_name_and_register_guid(self,child,item)
+				setattr(self, item_name, child)
+				self.opc_children.append(item_name)
+			elif self.opc_path in item:
+				variable_properties = None
+				child = self._create_variable(item,variable_properties)
+				var_name = approve_name_and_register_guid(self, child, child_name)
+				self.opc_children.append(var_name)
+				internal_counter += 1
+				setattr(self,var_name,child)
+				print(str(internal_counter).ljust(7) + 'Loaded var:' + item.ljust(os.get_terminal_size().columns-19), end="\r")
+			else:
+				new_path = '.'.join([self.opc_path,item])
+				child, internal_counter = Generic(new_path).reload_children(levels=levels-1,opc_cli=opc_cli,  counter=internal_counter)
 				item_name = approve_name_and_register_guid(self, child, item)
 				setattr(self,item_name,child)
 				self.opc_children.append(item_name)
@@ -257,12 +311,13 @@ class Generic(object):
 			result.add(self)
 		return result
 
-	def _all_of_class(self, re_class: str, filter_func=None) -> tPlasticParent:
+	def _all_of_class(self, re_class: str, filter_func=None, branches:bool=True) -> tPlasticParent:
 		children = self.all_of_class_as_set(re_class)
 		adopting_parent = PlasticParent('Adopting parent')
 		for child in children:
 			if not filter_func is None:
 				if not filter_func(child): continue
+			if (not branches) and hasattr(child, 'opc_children'): continue
 			new_attr_name = approve_name_and_register_guid(adopting_parent, child, child.opc_path.replace('.','_'))
 			adopting_parent.opc_children.append(new_attr_name)
 			setattr(adopting_parent,new_attr_name,child)
@@ -281,19 +336,21 @@ class Generic(object):
 			result.add(self)
 		return result
 
-	def _all_with_path(self, re_path: str, filter_func: Callable[[tGeneric],bool]=None) -> tPlasticParent:
+	def _all_with_path(self, re_path: str, filter_func: Callable[[tGeneric],bool]=None, branches:bool=True) -> tPlasticParent:
 		children = self.all_with_path_as_set(re_path)
 		adopting_parent = PlasticParent('Adopting parent')
 		for child in children:
 			if not filter_func is None:
 				if not filter_func(child): continue
+			if (not branches) and hasattr(child, 'opc_children'): continue
 			new_attr_name = approve_name_and_register_guid(adopting_parent, child, child.opc_path.replace('.', '_'))
 			adopting_parent.opc_children.append(new_attr_name)
 			setattr(adopting_parent,new_attr_name,child)
 		adopting_parent.opc_children.sort()
 		return adopting_parent
 
-	def all(self,re_path: str=None,re_class: str=None, filter_func: Callable[[tGeneric],bool]=None) -> tPlasticParent:
+	def all(self,re_path: str=None,re_class: str=None,
+			filter_func: Callable[[tGeneric],bool]=None, branches: bool=True) -> tPlasticParent:
 		"""Returns all children with matching opc-path and class
 		observe that the opc-path has dots '.' as separator between
 		parent and child
@@ -302,23 +359,25 @@ class Generic(object):
 		:re_path: The regular expression string that should be matched against the opc-path
 		:re_class: The regular expression string that should be matched against the class of the item
 		:filter_func: A custom filter like the ones in example_filters.py
+		:branches: Boolean value saying if branches (opc structs) should be included otherwise only leaves
 		:return: An Adopting parent with all the filtered objects as children on first level
 		"""
-		if not isinstance(re_path, str):
+		if not (isinstance(re_path, str) or re_path is None):
 			raise TypeError("re_path is of type " +str(type(re_path)) + " it should be a regex-string")
-		if not isinstance(re_class, str):
-			raise TypeError("re_class is of type " +str(type(re_path)) + " it should be a regex-string")
-		if not isfunction(filter_func):
+		if not (isinstance(re_class, str) or re_class is None):
+			raise TypeError("re_class is of type " +str(type(re_class)) + " it should be a regex-string")
+		if not (isfunction(filter_func) or filter_func is None):
 			raise TypeError("filter is of type " +str(type(filter_func)) + " it should be a function")
 		if (re_class is None) and (re_path is None):
-			return self._all_with_path(re_path='', filter_func=filter_func)
+			return self._all_with_path(re_path='', filter_func=filter_func, branches=branches)
 		if re_class is None:
-			return self._all_with_path(re_path, filter_func=filter_func)
+			return self._all_with_path(re_path, filter_func=filter_func, branches=branches)
 		if re_path is None:
-			return self._all_of_class(re_class, filter_func=filter_func)
-		return self._all_with_path(re_path, filter_func=filter_func)._all_of_class(re_class)
+			return self._all_of_class(re_class, filter_func=filter_func, branches=branches)
+		return self._all_with_path(re_path, filter_func=filter_func, branches=branches)._all_of_class(re_class)
 
-	def all_as_list(self,re_path=None,re_class=None, branches=True, filter_func=None) -> list:
+	def all_as_list(self,re_path: str=None,re_class: str=None,
+			filter_func: Callable[[tGeneric],bool]=None, branches: bool=True) -> list:
 		adopting_parent = self.all(re_path,re_class,filter_func)
 		if branches:
 			return [getattr(adopting_parent,child_path) for child_path in adopting_parent.opc_children]
@@ -336,7 +395,7 @@ class Generic(object):
 	def rename_child(self, name_now: str ,new_name: str) -> Self:
 		"""Rename a child with new OPC name
 		Changing the opc_path for all children below. Use in connection with
-		renaming in the PLC.
+		renaming in the PLC
 		:name_now: The old name
 		:new_name: The new name
 		:return: self
@@ -347,8 +406,8 @@ class Generic(object):
 		new_approved_name = approve_name_and_register_guid(self, child_to_rename, new_name)
 		if new_approved_name != new_name:
 			raise Exception("Proposed new name isn't appropriate, you can try: " + new_approved_name)
-		self.opc_children.append(new_approved_name)
 		self.opc_children.remove(name_now)
+		self.opc_children.append(new_approved_name)
 		delattr(self, name_now)
 		setattr(self,new_approved_name, child_to_rename)
 		child_to_rename._rename_in_opc_path(new_approved_name, level=0)
@@ -433,7 +492,6 @@ class Generic(object):
 		parent_with_all = self.all()
 		obj_to_write = [getattr(parent_with_all,child_path) for child_path in parent_with_all.opc_children
 					if not hasattr(getattr(parent_with_all,child_path),'opc_children')]
-		tags_write_data = []
 		try:
 			tags_write_data = [((obj.opc_path, value), obj.idx_prop[1], obj.idx_prop[5]) for obj in obj_to_write]
 		except AttributeError:
@@ -536,7 +594,6 @@ class Generic(object):
 			i += max_chunk
 		return adopting_parent
 
-
 class PlasticParent(Generic):
 
 	def combine_parent(self, other_parent: tGeneric):
@@ -546,13 +603,23 @@ class PlasticParent(Generic):
 			self.opc_children.append(new_attr_name)
 			setattr(self,new_attr_name,new_child)
 
-	def print_values(self) -> None:
+	def print_values(self, nbr_to_print: int=None) -> None:
 		"""Print child.value for all children on parent
+		if nbr_to_print is specified is only the specified number
+		of children printed.
 		:return: None
 		"""
-		for child in [getattr(self,path) for path in self.opc_children if not hasattr(getattr(self,path),'opc_children')]:
+		children_to_print = [getattr(self,path) for path in self.opc_children if not hasattr(getattr(self,path),'opc_children')]
+		if nbr_to_print is None: nbr_to_print = len(children_to_print)
+		for child in children_to_print[:nbr_to_print]:
 			try:
 				print(str(child.value).ljust(15) + child.opc_path)
 			except AttributeError:
-				print("Child.value is missing - You need to read the values before you can print them")
-				break
+				print(str('Not read').ljust(15) + child.opc_path)
+
+	def print_paths(self, nbr_to_print: int=None) -> None:
+		paths_to_print = [getattr(self, path).opc_path for path in self.opc_children]
+		if nbr_to_print is None: nbr_to_print = len(paths_to_print)
+		print('Printing ' + str(min(nbr_to_print,len(paths_to_print))) + ' of ' + str(len(paths_to_print)) + ' paths')
+		for path in paths_to_print[:nbr_to_print]:
+			print(path)

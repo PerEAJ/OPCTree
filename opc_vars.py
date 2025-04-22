@@ -2,6 +2,7 @@ import sys, re
 from importlib import reload
 
 
+
 class OpcVariable(object):
 	opc_path = None
 	

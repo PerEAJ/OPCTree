@@ -19,8 +19,8 @@ the children.
 
 ## Initialization
 ````
->>> import opc_fetch\
->>> nested_levels_to_search = 3\
+>>> import opc_fetch
+>>> nested_levels_to_search = 3
 >>> root = opc_fetch.connect_and_build(nested_levels_to_search)
 ````
 This will prompt you to input which server to connect to
@@ -90,11 +90,11 @@ name will it be saved as the name specified in ```settings.OPC_OBJ_PICKLE```
 (standard: 'opc_obj.pickle'). 
 The object can now be restored with either
 ````
->>>restored_root = opc_fetch.restore('\<file name if specified when saved\>')
+>>>restored_root = opc_fetch.restore('<file name if specified when saved>')
 ````
 or
 ````
->>>root_to_restore = root_to_restore.restore('\<file name if specified when saved\>')
+>>>root_to_restore = root_to_restore.restore('<file name if specified when saved>')
 ````
 ## Filter out specific parts by name or properties
 You can now filter out the parts of the tree that you are interested in by using
@@ -102,7 +102,7 @@ the ```.all('<your regular expression filter>')``` notation to get a new root wi
 children as leaves on the first level. If you for example want to filter out all 
 items that has an opc-path that ends with '.Forced' then you can write like this:
 ````
->>>temp_parent = root.all(r'\\.Forced$')
+>>>temp_parent = root.all(r'\.Forced$')
 ````
 Maybe you have a unit called 'H20' in App1.Diagram2 from which you
 want to filter out all controller values called 'Direct', 'Gain', 'Ti' and 'Td' from

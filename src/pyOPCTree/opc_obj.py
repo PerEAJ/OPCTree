@@ -1,12 +1,12 @@
 # encoding: utf-8
 from __future__ import print_function
-import os, sys, inspect, re, settings
+import os, sys, inspect, re
 import typing
+from . import settings, opc_vars
 from importlib import reload, import_module
 from inspect import isfunction
 from typing import Self, Callable, TypeVar
 
-import opc_vars
 
 global opc_client
 global guid_registry
@@ -262,7 +262,7 @@ class Generic(object):
 		return opc_vars.OpcVariable(opc_path, opc_properties=variable_properties)
 
 	def transform(self, diag=False) -> Self:
-		import opc_class_lib
+		from src.pyOPCTree import opc_class_lib
 		reload(opc_class_lib)
 		for lib in opc_class_lib.__all__:
 			print("Importing: " + lib)

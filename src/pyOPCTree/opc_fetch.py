@@ -2,10 +2,9 @@ from __future__ import print_function
 import json
 import typing
 
-import settings
 import OpenOPC
-import opc_obj
-from opc_obj import tGeneric
+from . import opc_obj, settings
+from .opc_obj import tGeneric
 
 global opc_client
 
@@ -42,7 +41,7 @@ def connect_and_extract_variables():
 	nbr_loaded_vars = 0
 	opc_client = OpenOPC.client()
 	opc_client.connect(settings.OPC_SERVER)
-	vars = _extract_variables(opc_client,settings.TOP_LEVEL)
+	vars = _extract_variables(opc_client, settings.TOP_LEVEL)
 	print()
 	save_vars(vars)
 	return vars

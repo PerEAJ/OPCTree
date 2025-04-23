@@ -1,7 +1,7 @@
 OPC_SERVER = None
 TOP_LEVEL = None
 
-WORKING_DIR = 'WorkingData//'
+WORKING_DIR = '../../WorkingData//'
 DATA_TYPES_FILE = WORKING_DIR + 'Data_Types.json'
 VARS_FILE = WORKING_DIR + 'OPC_Variables.json'
 IOINX_REG_FILE = WORKING_DIR + 'IOINX_Reg.json'

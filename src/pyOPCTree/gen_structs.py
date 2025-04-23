@@ -4,13 +4,13 @@ import re
 from openpyxl import load_workbook
 from collections import OrderedDict
 from os import listdir
-from opc_obj import Generic, approve_name_and_register_guid
-import opc_vars
+from .opc_obj import Generic, approve_name_and_register_guid
+from . import opc_vars
 
 
 def make_lib_file(workbook, lib_name:str, lib_dict:dict):
 	output = "#!/usr/bin/env python\n# -*- encoding: utf-8 -*-\n"
-	output += "import opc_obj"
+	output += "from . import opc_obj"
 	for lib in list(set(lib_dict.values())):
 		output += ", " + lib
 	output += """
@@ -101,7 +101,7 @@ class Gen_OPC_Obj(opc_obj.Generic):
 	return output, lib_dict
 
 def update_init_file():
-	with open('opc_class_lib\\__init__.py','w', encoding='utf-8') as initFile:
+	with open('opc_class_lib/__init__.py', 'w', encoding='utf-8') as initFile:
 		new_string = "__all__ = ["
 		for file in listdir('opc_class_lib'):
 			if "__init__.py" == file: continue
@@ -114,7 +114,7 @@ def create_from_StartValuesData():
 	"""Function to read data from ABB 800M
 	Start Value Analyzer files. The init-value
 	is put in a .init_value"""
-	dir_path = listdir('Input')
+	dir_path = listdir('../../Input')
 	start_value_folder_paths = ['Input\\' + folder_name for folder_name in dir_path if 'StartValuesData' in folder_name]
 	if len(start_value_folder_paths) == 0:
 		raise Exception("No folder name containing 'StartValuesData' in 'Input' folder")
@@ -184,9 +184,3 @@ if __name__ == "__main__":
 		with open(new_lib_name.replace('.','\\') +".py",'w', encoding='utf-8') as outputFile:
 			outputFile.write(output)
 	update_init_file()
-
-	# wb = load_workbook(filename='input\\MA_SJRA_AA_ObjLib_0_1.xlsx', read_only=True)
-	# new_lib_name = 'ma_sjra_aa_objlib_0_1'
-	# output, lib_dict = make_py_file(wb,new_lib_name,lib_dict)
-	# with open('opc_class_lib\\' + new_lib_name + ".py",'w') as outputFile:
-		# outputFile.write(output)

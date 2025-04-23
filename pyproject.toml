@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools >= 77.0.3"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyOPCTree"
+version = "1.0.0"
+description = "A tool for efficient CLI handling of OPC DA structures"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "Proprietary" }
+authors = [
+  { name="Per Johnsson", email="perjohns@gmail.com" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "et_xmlfile==2.0.0",
+    "openpyxl==3.1.5",
+    "Pyro5==5.15",
+    "pywin32==310",
+    "serpent==1.41",
+    "OpenOPC-DA @ git+https://github.com/PerEAJ/openopc.git@44cc821bd38a651d82311f4c793c26b752499a77"
+]
+
+[project.urls]
+Homepage = "https://github.com/PerEAJ/pyOPC"
+Issues = "https://github.com/PerEAJ/pyOPC/issues"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

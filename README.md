@@ -1,4 +1,4 @@
-# pyOPC - For efficient CLI maneuvers on OPC DA structures
+# pyOPC - A tool for efficient CLI handling off OPC DA structures
 
 This packaged is made for simplifying working with OPC data from the
 Python CLI. It enables easy scan of a nested structure, searching

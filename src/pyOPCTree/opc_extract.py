@@ -1,6 +1,5 @@
 #import settings
-import opc_fetch
-import struct_identi
+from . import opc_fetch, struct_identi
 from openpyxl import Workbook
 
 

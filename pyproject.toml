@@ -19,10 +19,8 @@ classifiers = [
 dependencies = [
     "et_xmlfile==2.0.0",
     "openpyxl==3.1.5",
-    "Pyro5==5.15",
     "pywin32==310",
-    "serpent==1.41",
-    "OpenOPC-DA>=1.5.1"
+    "OpenOPC-DA>=1.5.1
 ]
 
 [project.urls]

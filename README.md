@@ -9,6 +9,15 @@ The program copies the OPC structure of the server so that the user
 can use the OPC dot-notation in the CLI to traverse to the object
 the user wants to work on.
 
+## Problems with installation
+When this is written, is the latest version of OpenOPC, which is required, not
+published on pypi.org, and can't be installed by ``pip install OpenOPC-DA``,
+instead you need to download it/build it yourself from
+https://github.com/j3mg/openopc or get hold of the wheel elsewhere. The version
+number isn't published jet, but it should be higher than the current >1.5.0.
+If your OPC-server where you want to install it don't have access to internet
+you need to download/build wheels on another machine and transfer it.
+
 ## Notation
 A OPC "tree" is built upon branches, i.e. data structs and "leaves", i.e.
 OPC variables. The branches can have other branches as well as leaves on

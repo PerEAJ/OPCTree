@@ -1,4 +1,4 @@
-# pyOPC - A tool for efficient CLI handling off OPC DA structures
+# OPCTree - A tool for efficient CLI handling off OPC DA structures
 
 This packaged is made for simplifying working with OPC data from the
 Python CLI. It enables easy scan of a nested structure, searching
@@ -19,12 +19,12 @@ the children.
 
 ## Initialization
 ````
->>> import pyOPCTree
+>>> import OPCTree
 >>> nested_levels_to_search = 3
->>> root = pyOPCTree.connect_and_build(nested_levels_to_search)
+>>> root = OPCTree.connect_and_build(nested_levels_to_search)
 ````
 This will prompt you to input which server to connect to
-if you haven't specified it in ```pyOPCTree.settings.OPC_SERVER``` .
+if you haven't specified it in ```OPCTree.settings.OPC_SERVER``` .
 After connecting will it start searching through the structure, as many
 levels as given to ```connect_and_build```.
 

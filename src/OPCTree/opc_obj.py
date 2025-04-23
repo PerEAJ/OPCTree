@@ -262,7 +262,7 @@ class Generic(object):
 		return opc_vars.OpcVariable(opc_path, opc_properties=variable_properties)
 
 	def transform(self, diag=False) -> Self:
-		from src.pyOPCTree import opc_class_lib
+		from src.OPCTree import opc_class_lib
 		reload(opc_class_lib)
 		for lib in opc_class_lib.__all__:
 			print("Importing: " + lib)

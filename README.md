@@ -19,12 +19,12 @@ the children.
 
 ## Initialization
 ````
->>> import opc_fetch
+>>> import pyOPCTree
 >>> nested_levels_to_search = 3
->>> root = opc_fetch.connect_and_build(nested_levels_to_search)
+>>> root = pyOPCTree.connect_and_build(nested_levels_to_search)
 ````
 This will prompt you to input which server to connect to
-if you haven't specified it in ```settings.OPC_SERVER``` .
+if you haven't specified it in ```pyOPCTree.settings.OPC_SERVER``` .
 After connecting will it start searching through the structure, as many
 levels as given to ```connect_and_build```.
 

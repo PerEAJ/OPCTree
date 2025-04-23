@@ -8,7 +8,7 @@ on:
 jobs:
   build-and-publish:
     name: Build and publish to PyPI
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
 
     permissions:
       id-token: write  # Required for Trusted Publishing

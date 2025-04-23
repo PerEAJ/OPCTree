@@ -3,7 +3,7 @@ requires = ["setuptools >= 77.0.3"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "pyOPCTree"
+name = "OPCTree"
 version = "1.0.0"
 description = "A tool for efficient CLI handling of OPC DA structures"
 readme = "README.md"
@@ -26,8 +26,8 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/PerEAJ/pyOPC"
-Issues = "https://github.com/PerEAJ/pyOPC/issues"
+Homepage = "https://github.com/PerEAJ/OPCTree"
+Issues = "https://github.com/PerEAJ/OPCTree/issues"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      overflow: auto;
+    }
+    .node {
+      cursor: pointer;
+    }
+    .node circle {
+      fill: #fff;
+      stroke: steelblue;
+      stroke-width: 1.5px;
+    }
+    .node text {
+      font: 12px sans-serif;
+    }
+    .link {
+      fill: none;
+      stroke: #ccc;
+      stroke-width: 1.5px;
+    }
+    svg {
+      width: 100%;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+      fetch("vis_tree.json")
+        .then(response => response.json())
+        .then(treeData => {
+
+          const width = 1200;
+          const dx = 30, dy = 180;
+
+          const diagonal = d3.linkVertical()
+            .x(d => d.x)
+            .y(d => d.y);
+
+          const tree = d3.tree().nodeSize([dx, dy]);
+
+          const root = d3.hierarchy(treeData);
+          root.x0 = 0;
+          root.y0 = 0;
+          root.children?.forEach(collapse);
+
+          let i = 0;
+
+          const svgRoot = d3.select("body")
+            .append("svg")
+            .attr("viewBox", [-width / 2, 0, width, 1000])
+            .style("overflow", "visible");
+
+          const svg = svgRoot.append("g")
+            .attr("transform", "translate(0,40)");
+
+          function collapse(d) {
+            if (d.children) {
+              d._children = d.children;
+              d._children.forEach(collapse);
+              d.children = null;
+            }
+          }
+
+          function update(source) {
+            const nodes = root.descendants();
+            const links = root.links();
+
+            tree(root);
+
+            let left = root;
+            let right = root;
+            root.eachBefore(n => {
+              if (n.x < left.x) left = n;
+              if (n.x > right.x) right = n;
+            });
+
+            const height = d3.max(nodes, d => d.y) + 200;
+            const width = d3.max(nodes, d => d.x) - d3.min(nodes, d => d.x) + 100;
+
+            svgRoot.transition()
+              .duration(500)
+              .attr("viewBox", [-width / 2, 0, width, height]);
+
+            const node = svg.selectAll("g.node")
+              .data(nodes, d => d.id || (d.id = ++i));
+
+            const nodeEnter = node.enter().append("g")
+              .attr("class", "node")
+              .attr("transform", d => `translate(${source.x0},${source.y0})`)
+              .on("click", (event, d) => {
+                if (d.children) {
+                  d._children = d.children;
+                  d.children = null;
+                } else {
+                  d.children = d._children;
+                  d._children = null;
+                }
+                update(d);
+              });
+
+            nodeEnter.append("circle")
+              .attr("r", 1e-6)
+              .style("fill", d => d._children ? "lightsteelblue" : "#fff");
+
+            const nodeText = nodeEnter.append("text")
+                .attr("dy", d => (!d.children && !d._children) ? "1em" : ".35em")
+                .attr("x", d => (!d.children && !d._children) ? 0 : (d.children || d._children ? -10 : 10))
+                .attr("text-anchor", d => (!d.children && !d._children) ? "start" : (d.children || d._children ? "end" : "start"))
+                .attr("transform", d => (!d.children) ? "translate(6,6) rotate(90)" : null)
+                .text(d => d.data.name)
+                .on("click", (event, d) => {
+                  event.stopPropagation();
+                  if (d.data.opc_properties && Object.keys(d.data.opc_properties).length > 0) {
+                    alert("OPC Properties for " + d.data.name + ":\\n" +
+                          JSON.stringify(d.data.opc_properties, null, 2));
+                  }
+                });
+
+            const nodeUpdate = nodeEnter.merge(node);
+
+            nodeUpdate.transition()
+              .duration(500)
+              .attr("transform", d => `translate(${d.x},${d.y})`);
+
+            nodeUpdate.select("circle")
+              .attr("r", 6)
+              .style("fill", d => d._children ? "lightsteelblue" : "#fff");
+
+            const nodeExit = node.exit().transition()
+              .duration(500)
+              .attr("transform", d => `translate(${source.x},${source.y})`)
+              .remove();
+
+            nodeExit.select("circle")
+              .attr("r", 1e-6);
+
+            nodeExit.select("text")
+              .style("fill-opacity", 1e-6);
+
+            const link = svg.selectAll("path.link")
+              .data(links, d => d.target.id);
+
+            const linkEnter = link.enter().insert("path", "g")
+              .attr("class", "link")
+              .attr("d", d => {
+                const o = {x: source.x0, y: source.y0};
+                return diagonal({source: o, target: o});
+              });
+
+            link.merge(linkEnter).transition()
+              .duration(500)
+              .attr("d", d => diagonal(d));
+
+            link.exit().transition()
+              .duration(500)
+              .attr("d", d => {
+                const o = {x: source.x, y: source.y};
+                return diagonal({source: o, target: o});
+              }).remove();
+
+            nodes.forEach(d => {
+              d.x0 = d.x;
+              d.y0 = d.y;
+            });
+          }
+
+          update(root);
+      });
+  </script>
+</body>

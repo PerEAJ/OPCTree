@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "OPCTree"
-version = "1.0.1"
+version = "1.1.0"
 description = "A tool for efficient CLI handling of OPC DA structures"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -32,3 +32,6 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"OPCTree" = ["visualize.vis_template.html"]

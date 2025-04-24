@@ -3,11 +3,13 @@ from __future__ import print_function
 import os, sys, inspect, re
 import typing
 from http.client import NotConnected
+from pathlib import Path
 
 from . import settings, opc_vars, visualize
 from importlib import reload, import_module
 from inspect import isfunction
 from typing import Self, Callable, TypeVar
+
 
 
 global opc_client
@@ -127,9 +129,12 @@ def approve_name_and_register_guid(parent: tGeneric, obj: typing.Optional[typing
 
 def restore(file_name: str=None, working_dir=None) -> None:
 	import pickle
+	os.chdir(Path(__file__).parent.parent.parent.parent.parent)
 	file_dir = working_dir if not working_dir is None else settings.WORKING_DIR
 	file_path = os.path.join(file_dir, file_name + '.pickle') if not file_name is None else os.path.join(file_dir,
 																										 'opc_obj.pickle')
+	print("Current Working Directory: " + str(os.getcwd()))
+	print("Loading from: " + str(os.path.abspath(file_path)))
 	with open(file_path, 'rb') as pickle_file:
 		return pickle.load(pickle_file)
 

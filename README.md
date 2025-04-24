@@ -253,3 +253,9 @@ of its children.
 If you fixed a bug or added some nice fetcher, request a pull on your
 branch of the code so that it can be added to the main branch for others
 to enjoy.
+
+## Visualization in browser
+If you want to see the structure in a web-browser you can use ``.visualize()``
+on a node. This will generate a json-file, start a webserver providing the 
+json-fil together with the vis_template.html page with which you can see
+the structure. The node is collapsed by default and are expanded when clicked.

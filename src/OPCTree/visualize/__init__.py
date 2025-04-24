@@ -12,8 +12,14 @@ def is_port_in_use(port):
         return s.connect_ex(("localhost", port)) == 0
 
 def start_server_in_background(directory, port=8000):
-    handler = http.server.SimpleHTTPRequestHandler
-    os.chdir(directory)
+    class CustomHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
+        def translate_path(self, path):
+            # Översätt sökvägen till den angivna katalogen
+            path = super().translate_path(path)
+            relative_path = os.path.relpath(path, os.getcwd())
+            return os.path.join(directory, relative_path)
+
+    handler = CustomHTTPRequestHandler
 
     def serve():
         with socketserver.TCPServer(("", port), handler) as httpd:
@@ -28,7 +34,7 @@ def generate_html_visualization(root_node, start_server=True, port=8000):
         return {
             "name": ('.' + str(node.opc_path)).split('.')[-1],
             "type": node.__class__.__name__,
-            "opc_properties": getattr(node, "idx_prop", {}),
+            "opc_properties": getattr(node, "name_prop", {}),
             "children": [serialize_node(getattr(node,child)) for child in getattr(node, "opc_children", [])]
         }
 

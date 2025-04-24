@@ -4,6 +4,8 @@ import re
 from openpyxl import load_workbook
 from collections import OrderedDict
 from os import listdir
+from pathlib import Path
+
 from .opc_obj import Generic, approve_name_and_register_guid
 from . import opc_vars
 
@@ -114,7 +116,7 @@ def create_from_StartValuesData():
 	"""Function to read data from ABB 800M
 	Start Value Analyzer files. The init-value
 	is put in a .init_value"""
-	dir_path = listdir('../../Input')
+	dir_path = listdir(Path(__file__).parent.parent.parent.parent.parent / 'Input')
 	start_value_folder_paths = ['Input\\' + folder_name for folder_name in dir_path if 'StartValuesData' in folder_name]
 	if len(start_value_folder_paths) == 0:
 		raise Exception("No folder name containing 'StartValuesData' in 'Input' folder")

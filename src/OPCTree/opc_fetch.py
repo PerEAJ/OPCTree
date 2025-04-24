@@ -9,7 +9,7 @@ from .opc_obj import tGeneric
 global opc_client
 
 
-def initiate_opc_client():
+def initialize_opc_client():
 	global opc_client
 	opc_client = OpenOPC.client()
 	if not settings.OPC_SERVER is None:
@@ -30,7 +30,7 @@ def initiate_opc_client():
 
 def connect_and_build(levels = -1):
 	global opc_client
-	initiate_opc_client()
+	initialize_opc_client()
 	return opc_obj.Generic(settings.TOP_LEVEL).load_children(levels, opc_client)
 
 def load_existing(file_name: str=None, working_dir=None):

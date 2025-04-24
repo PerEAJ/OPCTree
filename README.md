@@ -259,3 +259,22 @@ If you want to see the structure in a web-browser you can use ``.visualize()``
 on a node. This will generate a json-file, start a webserver providing the 
 json-fil together with the vis_template.html page with which you can see
 the structure. The node is collapsed by default and are expanded when clicked.
+
+## Restore ABB 800M StartValueAnalyzer Data
+The module allows building a root based on StartValueAnalyzer files from an ABB
+800M PLC. If you want to use that you need to create a folder "Input" in your
+working directory, and in that folder put the files from the StartValueAnalyzer
+tool (found on 800xA installation media). So that you have paths like this:
+'\Input\StartValuesData_YYYY-MM-DD HH.MM.SS.mils'
+
+Project/\
+├── .venv          ← Your virtual environment\
+├── Input/         ← Folder to put the StartValuesData in\
+└── WorkingDir/    ← Optional folder for saving/restoring root\
+
+You can then run ``new_root = OPCTree.create_from_StartValuesData()`` which will
+create a new root built on your extracted values. All leaves will be given an
+attribute ``.init_value`` holding the initial value, and the ``.value`` will hold
+the retrieved retained value, which could be written back to the live application
+with ``.write``, if you are connected to the OPC server. If you aren't
+you need to initialize it first, which could be done with ``OPCTree.initialize_opc_client()``.

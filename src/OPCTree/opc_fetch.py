@@ -33,8 +33,8 @@ def connect_and_build(levels = -1):
 	initiate_opc_client()
 	return opc_obj.Generic(settings.TOP_LEVEL).load_children(levels, opc_client)
 
-def load_existing():
-	return opc_obj.restore()
+def load_existing(file_name: str=None, working_dir=None):
+	return opc_obj.restore(file_name, working_dir)
 
 def connect_and_extract_variables():
 	global nbr_loaded_vars

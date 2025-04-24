@@ -2,7 +2,9 @@
 from __future__ import print_function
 import os, sys, inspect, re
 import typing
-from . import settings, opc_vars
+from http.client import NotConnected
+
+from . import settings, opc_vars, visualize
 from importlib import reload, import_module
 from inspect import isfunction
 from typing import Self, Callable, TypeVar
@@ -123,9 +125,11 @@ def approve_name_and_register_guid(parent: tGeneric, obj: typing.Optional[typing
 		return new_name
 
 
-def restore(file_name=None) -> None:
+def restore(file_name: str=None, working_dir=None) -> None:
 	import pickle
-	file_path = settings.OPC_OBJ_PICKLE if file_name is None else settings.WORKING_DIR + file_name + '.pickle'
+	file_dir = working_dir if not working_dir is None else settings.WORKING_DIR
+	file_path = os.path.join(file_dir, file_name + '.pickle') if not file_name is None else os.path.join(file_dir,
+																										 'opc_obj.pickle')
 	with open(file_path, 'rb') as pickle_file:
 		return pickle.load(pickle_file)
 
@@ -155,8 +159,9 @@ class Generic(object):
 		all children.
 		:return: The upgraded version
 		"""
-		reload(sys.modules['opc_obj'])
-		reload(sys.modules['opc_vars'])
+		reload(sys.modules[__name__])
+		reload(sys.modules[opc_vars.__name__])
+		reload(sys.modules[visualize.__name__])
 		reload(sys.modules[self.__class__.__module__])
 		self_class = getattr(sys.modules[self.__class__.__module__],self.__class__.__name__)
 		new_self = self_class(self.opc_path,self)
@@ -385,12 +390,18 @@ class Generic(object):
 			return [getattr(adopting_parent,child_path) for child_path in adopting_parent.opc_children
 					if not hasattr(getattr(adopting_parent,child_path),'opc_children')]
 
-	def save(self, file_name: str=None) -> None:
+	def save(self, file_name: str=None, working_dir=None) -> None:
 		import pickle
-		file_path = settings.OPC_OBJ_PICKLE if file_name is None else settings.WORKING_DIR + file_name + '.pickle'
+		file_dir = working_dir if not working_dir is None else settings.WORKING_DIR
+		try:
+			os.mkdir(file_dir)
+		except FileExistsError:
+			pass
+		file_path = os.path.join(file_dir, file_name + '.pickle') if not file_name is None else os.path.join(file_dir, 'opc_obj.pickle')
 		with open(file_path, 'wb') as pickle_file:
 			# noinspection PyTypeChecker
 			pickle.dump(self,pickle_file)
+			print('Saved to: ' + file_path)
 
 	def rename_child(self, name_now: str ,new_name: str) -> Self:
 		"""Rename a child with new OPC name
@@ -424,7 +435,10 @@ class Generic(object):
 	def first_read(self, opc_cli=None, max_chunk=40) -> Self:
 		global opc_client
 		if opc_cli is None:
-			opc_cli = opc_client
+			try:
+				opc_cli = opc_client
+			except NameError:
+				raise NotConnected("You have to initialize the OPC client first, try OPCTree.opc_fetch.initiate_opc_client()")
 		parent_with_all = self.all()
 		obj_to_read = [getattr(parent_with_all,child_path) for child_path in parent_with_all.opc_children
 					if not ((hasattr(getattr(parent_with_all,child_path),'opc_children'))
@@ -593,6 +607,9 @@ class Generic(object):
 					setattr(adopting_parent, new_attr_name, obj)
 			i += max_chunk
 		return adopting_parent
+
+	def visualize(self):
+		visualize.generate_html_visualization(self)
 
 class PlasticParent(Generic):
 

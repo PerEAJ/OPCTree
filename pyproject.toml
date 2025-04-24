@@ -20,7 +20,7 @@ dependencies = [
     "et_xmlfile==2.0.0",
     "openpyxl==3.1.5",
     "pywin32==310",
-    "OpenOPC-DA>=1.5.1
+    "OpenOPC-DA>=1.5.1"
 ]
 
 [project.urls]

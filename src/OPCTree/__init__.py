@@ -1,2 +1,2 @@
-from .opc_fetch import connect_and_build, load_existing, initiate_opc_client
+from .opc_fetch import connect_and_build, load_existing, initialize_opc_client
 from .gen_structs import create_from_StartValuesData

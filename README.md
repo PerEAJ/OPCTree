@@ -265,7 +265,7 @@ The module allows building a root based on StartValueAnalyzer files from an ABB
 800M PLC. If you want to use that you need to create a folder "Input" in your
 working directory, and in that folder put the files from the StartValueAnalyzer
 tool (found on 800xA installation media). So that you have paths like this:
-'\Input\StartValuesData_YYYY-MM-DD HH.MM.SS.mils'
+'\Input\StartValuesData_YYYY-MM-DD HH.MM.SS.mmmm'
 
 Project/\
 ├── .venv          ← Your virtual environment\

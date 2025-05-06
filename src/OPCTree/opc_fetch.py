@@ -11,7 +11,10 @@ global opc_client
 
 def initialize_opc_client():
 	global opc_client
-	opc_client = OpenOPC.client()
+	try:
+		opc_client = OpenOPC.client()
+	except:
+		raise Exception('No OPC Servers available')
 	if not settings.OPC_SERVER is None:
 		opc_client.connect(settings.OPC_SERVER)
 	else:
@@ -77,7 +80,5 @@ def restore(file_name: typing.Optional[str]) -> tGeneric:
 	return opc_obj.restore(file_name)
 			
 if __name__ == "__main__":
-	# OPC_SERVER = 'ABB.AC800MC_OpcDaServer.3'
-	# TOP_LEVEL = 'Applications.MA_SJRA_AA.App.HMI.C01'
 	variables = connect_and_extract_variables()
 	print(variables)

@@ -220,6 +220,37 @@ class Generic(object):
 			return self
 		return self, internal_counter
 
+	def _load_children_rec(self, opc_cli=None) -> Self:
+		global opc_client
+		if not 'opc_client' in globals():
+			opc_client = opc_cli
+		elif opc_cli is None:
+			opc_cli = opc_client
+		result = opc_cli.list(self.opc_path, recursive=True)
+		for old_child in self.opc_children:
+			delattr(self,old_child)
+		self.opc_children = []
+		root = self
+		for path in result:
+			path = path.replace(root.opc_path + '.','')
+			pos = root
+			part_path = ''
+			for part in path.split('.')[:-1]:
+				part_path += '.' + part
+				attr_name = approve_name_and_register_guid(pos, None, item_name=part)
+				if hasattr(pos, attr_name):
+					pos = getattr(pos, attr_name)
+				else:
+					new_child = Generic(part_path[1:])
+					pos.opc_children.append(attr_name)
+					setattr(pos, attr_name, Generic(part_path[1:]))
+					pos = new_child
+			attr_name = approve_name_and_register_guid(pos, None, item_name=path.split('.')[-1])
+			leaf = opc_vars.OpcVariable(path)
+			pos.opc_children.append(attr_name)
+			setattr(pos, attr_name, leaf)
+		return self
+
 	def reload_children(self, levels: int=-1, opc_cli=None, counter: int=None, ignore_existing=False) -> Self:
 		global opc_client
 		if not 'opc_client' in globals():

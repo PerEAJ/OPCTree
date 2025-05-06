@@ -262,6 +262,11 @@ or simply
 ````
 >>>branch_with_child_to_rename.rename_child('child_old_name', 'new_name')
 ````
+## Visualization in browser
+If you want to see the structure in a web-browser you can use ``.visualize()``
+on a node. This will generate a json-file, start a webserver providing the 
+json-fil together with the vis_template.html page with which you can see
+the structure. The node is collapsed by default and are expanded when clicked.
 
 ## Custom coding and upgrading
 If you want a function that is missing, don't hesitate to add it, after

@@ -9,15 +9,6 @@ The program copies the OPC structure of the server so that the user
 can use the OPC dot-notation in the CLI to traverse to the object
 the user wants to work on.
 
-## Problems with installation
-When this is written, is the latest version of OpenOPC, which is required, not
-published on pypi.org, and can't be installed by ``pip install OpenOPC-DA``,
-instead you need to download it/build it yourself from
-https://github.com/j3mg/openopc or get hold of the wheel elsewhere. The version
-number isn't published jet, but it should be higher than the current >1.5.0.
-If your OPC-server where you want to install it don't have access to internet
-you need to download/build wheels on another machine and transfer it.
-
 ## Notation
 A OPC "tree" is built upon branches, i.e. data structs and "leaves", i.e.
 OPC variables. The branches can have other branches as well as leaves on
@@ -26,12 +17,45 @@ parent node, i.e. the data struct. Children can be transferred to another tempor
 parent node, that parent node is then referred to as the "plastic parent" of
 the children.
 
+### Offline installation
+If you are going to run the program from a server without access to internet will
+you have to download the wheels and also download the file 
+d3.v7.min.js from https://d3js.org/d3.v7.min.js . To download the wheels run:
+````bash
+py -m venv .venv
+.venv\Scripts\activate.bat
+pip install OPCTree
+pip freeze > r.txt
+pip download -r r.txt
+````
+in the folder will you now have the wheels. Move them to the offline server together with
+the d3.v7.min.js file you fetched. On the offline server run:
+````bash
+py -m venv .venv
+pip install -r r.txt
+````
+you should now have a structure like this:
+````graphql
+Project/
+├── .venv/                                        # Your virutal environment
+│   └── Lib/
+│       └── site-packages/        
+│           └── OPCTree/
+│               └── visualize/
+│                   ├── __init__.py
+│                   ├── vis_template.html
+│                   └── d3.v7.min.js              # HERE SHOULD YOU PLACE d3.v7.min.js
+├── Input/                                        # Alternativ plats för StartValuesData\
+└── WorkingDir/                                   # (Valfri) mapp för att spara/återställa root\
+````
+Observe that you manually have to move the d3.v7.min.js file to the location specified above.
+
 ## Initialization
-````
->>> import OPCTree
->>> nested_levels_to_search = 3
->>> root = OPCTree.connect_and_build(nested_levels_to_search)
-````
+```python
+import OPCTree
+nested_levels_to_search = 3
+root = OPCTree.connect_and_build(nested_levels_to_search)
+```
 This will prompt you to input which server to connect to
 if you haven't specified it in ```OPCTree.settings.OPC_SERVER``` .
 After connecting will it start searching through the structure, as many
@@ -43,8 +67,8 @@ __Tab__ be used to auto-complete and __Tab__ __Tab__ for showing available child
 
 In the list will also the methods defined on the item show, if you want to
 distinguish which is the actual OPC children, then you can look in
-````
->>>root.opc_children
+````python
+root.opc_children
 ````
 That is a list caring the name of all opc children on the parent. Observe that
 the names differ slightly from their opc-path if their name wasn't possible to
@@ -92,7 +116,7 @@ which reads 1000 properties on each call.
 After reading all properties you probably want to save your updated root. Do that
 by writing
 ````
->>>root.save(\<optional string with name\>)
+>>>root.save(<optional string with name>)
 ````
 the object is now saved as '<optional name>.pickle'. If you don't specify a
 name will it be saved as the name specified in ```settings.OPC_OBJ_PICKLE```
@@ -254,27 +278,21 @@ If you fixed a bug or added some nice fetcher, request a pull on your
 branch of the code so that it can be added to the main branch for others
 to enjoy.
 
-## Visualization in browser
-If you want to see the structure in a web-browser you can use ``.visualize()``
-on a node. This will generate a json-file, start a webserver providing the 
-json-fil together with the vis_template.html page with which you can see
-the structure. The node is collapsed by default and are expanded when clicked.
-
 ## Restore ABB 800M StartValueAnalyzer Data
 The module allows building a root based on StartValueAnalyzer files from an ABB
 800M PLC. If you want to use that you need to create a folder "Input" in your
 working directory, and in that folder put the files from the StartValueAnalyzer
 tool (found on 800xA installation media). So that you have paths like this:
 '\Input\StartValuesData_YYYY-MM-DD HH.MM.SS.mmmm'
-
-Project/\
-├── .venv          ← Your virtual environment\
-├── Input/         ← Folder to put the StartValuesData in\
-└── WorkingDir/    ← Optional folder for saving/restoring root\
-
+````
+Project/
+├── .venv          ← Your virtual environment
+├── Input/         ← Folder to put the StartValuesData in
+└── WorkingDir/    ← Optional folder for saving/restoring root
+````
 You can then run ``new_root = OPCTree.create_from_StartValuesData()`` which will
 create a new root built on your extracted values. All leaves will be given an
 attribute ``.init_value`` holding the initial value, and the ``.value`` will hold
 the retrieved retained value, which could be written back to the live application
-with ``.write``, if you are connected to the OPC server. If you aren't
+with ``.write``, if you are connected to the OPC server. If you aren't,
 you need to initialize it first, which could be done with ``OPCTree.initialize_opc_client()``.

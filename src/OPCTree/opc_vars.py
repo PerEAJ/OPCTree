@@ -25,8 +25,14 @@ class OpcVariable(object):
 		self.__dict__.update(new_self.__dict__)
 		return new_self
 		
-	def _transform(self):
+	def _transform(self, diag=False):
 		if not hasattr(self, 'name_prop'):
+			return self
+		elif not isinstance(self.name_prop,dict):
+			if diag: raise Exception(self.opc_path + " name_prop not dict.")
+			return self
+		elif not 'Item Type Name' in self.name_prop:
+			if diag: print(self.opc_path + " is missing 'Item Type Name' in name_prop")
 			return self
 		elif self.name_prop['Item Type Name'] == u'bool':
 			return Bool(opc_path=self.opc_path, predecessor=self)
@@ -71,6 +77,9 @@ class OpcVariable(object):
 			print("re_path: " + str(re_path) + " , self.opc_path: " + str(self.opc_path))
 			raise TypeError
 		return set()
+
+	def scada_conf(self):
+		return  {'LEAFS>>':[self.__class__.__name__,self.opc_path]}
 		
 class AnalogVar(OpcVariable):
 
@@ -85,6 +94,9 @@ class AnalogVar(OpcVariable):
 			for attribute in [a for a in dir(predecessor) if not a.startswith('__') and not callable(getattr(predecessor,a))]:
 				setattr(self,attribute,getattr(predecessor,attribute))
 
+	def scada_conf(self):
+		return  {'ANALOG_VAR>>':['AI',self.opc_path]}
+
 class Bool(OpcVariable):
 
 	def __init__(self,opc_path,predecessor = None, description = '', parameter=''):
@@ -94,6 +106,9 @@ class Bool(OpcVariable):
 		if not predecessor is None:
 			for attribute in [a for a in dir(predecessor) if not a.startswith('__') and not callable(getattr(predecessor,a))]:
 				setattr(self,attribute,getattr(predecessor,attribute))
+
+	def scada_conf(self):
+		return  {'BOOL_VAR>>':['DI',self.opc_path]}
 
 class Int(AnalogVar):
 	pass

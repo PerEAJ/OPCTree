@@ -9,8 +9,7 @@ from . import settings, opc_vars, visualize
 from importlib import reload, import_module
 from inspect import isfunction
 from typing import Self, Callable, TypeVar
-
-
+from collections import OrderedDict, Counter
 
 global opc_client
 global guid_registry
@@ -176,7 +175,7 @@ class Generic(object):
 		return new_self
 
 	def test(self) -> None:
-		print('Test7')
+		print('Test1')
 
 	def load_children(self, levels: int=-1, opc_cli=None, counter: int=None) -> Self:
 		global opc_client
@@ -303,11 +302,11 @@ class Generic(object):
 		return opc_vars.OpcVariable(opc_path, opc_properties=variable_properties)
 
 	def transform(self, diag=False) -> Self:
-		from src.OPCTree import opc_class_lib
+		from . import opc_class_lib
 		reload(opc_class_lib)
 		for lib in opc_class_lib.__all__:
 			print("Importing: " + lib)
-			module = import_module('opc_class_lib.' + lib)
+			module = import_module(opc_class_lib.__name__ +'.'+ lib)
 			reload(module)
 		return self._transform(diag)
 
@@ -359,6 +358,7 @@ class Generic(object):
 			if not filter_func is None:
 				if not filter_func(child): continue
 			if (not branches) and hasattr(child, 'opc_children'): continue
+			if child.opc_path is None: continue
 			new_attr_name = approve_name_and_register_guid(adopting_parent, child, child.opc_path.replace('.','_'))
 			adopting_parent.opc_children.append(new_attr_name)
 			setattr(adopting_parent,new_attr_name,child)
@@ -647,6 +647,39 @@ class Generic(object):
 	def visualize(self):
 		visualize.generate_html_visualization(self)
 
+	def scada_conf(self):
+		scada_config = OrderedDict()
+
+		def append_conf(child_scada_conf):
+			for table_name, table_rows in child_scada_conf.items():
+				if table_name in scada_config:
+					scada_config[table_name].extend(table_rows)
+				else:
+					scada_config[table_name] = table_rows
+
+		for attribute in self.opc_children:
+			try:
+				append_conf(getattr(self, attribute).scada_conf())
+			except ValueError:
+				print(getattr(self, attribute).scada_conf())
+		append_conf(self._scada_conf())
+		return scada_config
+
+	def _scada_conf(self):
+		"""
+		Overwrite function in children to pass conf or
+		change here so that the result depend on
+		__class__.__name__
+		Add the wanted tables to result as
+		result['table_name>>']
+		"""
+		result = OrderedDict()
+		if self.__class__.__name__ == 'Generic':
+			result['Generic'] = {'BRANCHES>>':[self.__class__.__name__,self.opc_path]}
+		# elif root.__class__.__name__ == '<TypeName>':
+		#	"""Add what you need exported here"""
+		return result
+
 class PlasticParent(Generic):
 
 	def combine_parent(self, other_parent: tGeneric):
@@ -676,3 +709,15 @@ class PlasticParent(Generic):
 		print('Printing ' + str(min(nbr_to_print,len(paths_to_print))) + ' of ' + str(len(paths_to_print)) + ' paths')
 		for path in paths_to_print[:nbr_to_print]:
 			print(path)
+
+	def print_classes(self) -> None:
+		classes_to_print = [getattr(self, path).__class__.__name__ for path in self.opc_children]
+		print('Nbr of Type   Type Name')
+		sum = 0
+		lastNbr = 0
+		for class_name, count in Counter(classes_to_print).items():
+			print(str(count).ljust(14) + class_name)
+			sum += count
+			lastNbr = count
+		if lastNbr != sum:
+			print("In total " + str(sum) + " items")

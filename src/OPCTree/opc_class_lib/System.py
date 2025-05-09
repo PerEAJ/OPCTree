@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- encoding: utf-8 -*-
-from src import opc_obj, opc_vars
+from .. import opc_obj, opc_vars
 
-
+	
 class Gen_OPC_Obj(opc_obj.Generic):
 	def test(self):
 		print('Is ' + self.__class__.__name__)

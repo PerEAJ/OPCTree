@@ -263,6 +263,12 @@ or simply
 >>>branch_with_child_to_rename.rename_child('child_old_name', 'new_name')
 ````
 
+## Visualization in browser
+If you want to see the structure in a web-browser you can use ``.visualize()``
+on a node. This will generate a json-file, start a webserver providing the 
+json-fil together with the vis_template.html page with which you can see
+the structure. The node is collapsed by default and are expanded when clicked.
+
 ## Custom coding and upgrading
 If you want a function that is missing, don't hesitate to add it, after
 adding or modification of opc_obj.py, opc_vars.py or custom
@@ -277,6 +283,32 @@ of its children.
 If you fixed a bug or added some nice fetcher, request a pull on your
 branch of the code so that it can be added to the main branch for others
 to enjoy.
+
+## Transform
+The OPC-Generic objects can be transformed into types that the user has specified
+and those objects can get customized methods to do useful stuf. The objects that
+the Generic objects can transform into are divided into different "libraries" in the
+opc_class_lib folder.
+
+In the OPC-server are there different data structs representing the different objects 
+in the PLC, those types are normally of different types from different PLC programming
+libraries. Then interacting with the OPC-server there might be a need to do different
+stuf for different PLC object types. Say that you for example want to generate a configuration
+for a SCADA system from the OPC-tree, then you want to first transform your tree into a 
+tree of the types in your PLC library
+of the data structs that are of a special type, and then you want 
+
+### Building a mirror of the PLC libraries
+The Generic opc-structs that has been fetched can be transformed into, types
+specified by the user in two different ways:
+
+1. Data struct libraries built from Excel Worksheets
+2. Automatically identified types
+The purpose of the make_lib function in gen_structs.py is to allow the users to specify
+their own data structs in Excel workbooks, which are read and translated into 
+opc_class_lib-"libraries" which the Generic fetched OPC-object then can be transformed
+into, evaluated on 
+
 
 ## Restore ABB 800M StartValueAnalyzer Data
 The module allows building a root based on StartValueAnalyzer files from an ABB

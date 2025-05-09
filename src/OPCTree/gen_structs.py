@@ -12,9 +12,16 @@ from . import opc_vars
 
 def make_lib_file(workbook, lib_name:str, lib_dict:dict):
 	output = "#!/usr/bin/env python\n# -*- encoding: utf-8 -*-\n"
-	output += "from . import opc_obj"
-	for lib in list(set(lib_dict.values())):
-		output += ", " + lib
+	output += "from .. import opc_obj, opc_vars\n"
+	libs_to_import = list(set(lib_dict.values()))
+	opc_class_libs = [lib for lib in libs_to_import if lib not in ['opc_vars','opc_obj']]
+	print(opc_class_libs)
+	if len(opc_class_libs) > 0:
+		output += 'from . import '
+		for lib in opc_class_libs[:-1]:
+			output += lib + ', '
+		output += opc_class_libs[-1] + '\n'
+
 	output += """
 	
 class Gen_OPC_Obj(opc_obj.Generic):
@@ -44,6 +51,7 @@ class Gen_OPC_Obj(opc_obj.Generic):
 			if attribute_name.title() == 'Dummy':
 				continue
 			child_class_name = ws.cell(row=row, column=2).value
+			item_attributes = ws.cell(row=row, column=3).value
 			col_6 = ws.cell(row=row, column=6).value
 			#col_7 = ws.cell(row=row, column=7).value
 			#col_8 = ws.cell(row=row, column=8).value
@@ -78,6 +86,12 @@ class Gen_OPC_Obj(opc_obj.Generic):
 			else:
 				output += "(opc_path + '." +attribute_name+ "', description=description"
 
+			if item_attributes is None:
+				pass
+			elif 'coldretain' in item_attributes.lower():
+				output += ", opc_properties = [(5002,'Item Attribute', 'ColdRetain')]"
+			elif 'retain' in item_attributes.lower():
+				output += ", opc_properties = [(5002,'Item Attribute', 'Retain')]"
 			# if not parameter is None:
 			# 	if parameter == '[para]':
 			# 		output += ", parameter= self.parameter"
@@ -103,9 +117,10 @@ class Gen_OPC_Obj(opc_obj.Generic):
 	return output, lib_dict
 
 def update_init_file():
-	with open('opc_class_lib/__init__.py', 'w', encoding='utf-8') as initFile:
+	opc_class_lib_path = Path(__file__).parent / 'opc_class_lib'
+	with open(opc_class_lib_path / '__init__.py', 'w', encoding='utf-8') as initFile:
 		new_string = "__all__ = ["
-		for file in listdir('opc_class_lib'):
+		for file in listdir(opc_class_lib_path):
 			if "__init__.py" == file: continue
 			if file[-3:] == '.py':
 				new_string += "'" + file[:-3] + "',"
@@ -116,8 +131,8 @@ def create_from_StartValuesData():
 	"""Function to read data from ABB 800M
 	Start Value Analyzer files. The init-value
 	is put in a .init_value"""
-	dir_path = listdir(Path(__file__).parent.parent.parent.parent.parent / 'Input')
-	start_value_folder_paths = ['Input\\' + folder_name for folder_name in dir_path if 'StartValuesData' in folder_name]
+	dir_paths = listdir(Path(__file__).parent.parent.parent.parent.parent / 'Input')
+	start_value_folder_paths = ['Input\\' + folder_name for folder_name in dir_paths if 'StartValuesData' in folder_name]
 	if len(start_value_folder_paths) == 0:
 		raise Exception("No folder name containing 'StartValuesData' in 'Input' folder")
 	if len(start_value_folder_paths) == 1:
@@ -176,13 +191,19 @@ def create_from_StartValuesData():
 
 
 if __name__ == "__main__":
+	input_path = Path(__file__).parent.parent.parent.parent.parent / 'Input'
+	opc_class_lib_path = Path(__file__).parent / 'opc_class_lib'
 	lib_dict = {'Real':'opc_vars','Bool':'opc_vars','Time':'opc_vars','Uint':'opc_vars','Dint':'opc_vars','Dword':'opc_vars','Word':'opc_vars','Date_And_Time':'opc_vars','String':'opc_vars'}
 	lib_and_file_to_create = OrderedDict()
-	lib_and_file_to_create['opc_class_lib.System']  = 'input\\System.xlsx'
-	lib_and_file_to_create['opc_class_lib.BasicLib_1_8_5'] = 'input\\BasicLib_1_8_5.xlsx'
+	lib_files = [lib_file for lib_file in listdir(input_path) if '.xlsx' in lib_file]
+	lib_files.sort()
+	for lib_file in lib_files:
+		lib_and_file_to_create[lib_file[:-5].lstrip('0123456789')] = input_path / lib_file
+
 	for new_lib_name, from_file in lib_and_file_to_create.items():
 		wb = load_workbook(filename=from_file, read_only=True)
 		output, lib_dict = make_lib_file(wb,new_lib_name,lib_dict)
-		with open(new_lib_name.replace('.','\\') +".py",'w', encoding='utf-8') as outputFile:
+		with open(opc_class_lib_path / (new_lib_name + ".py"),'w', encoding='utf-8') as outputFile:
 			outputFile.write(output)
+			print('Created opc_class_lib.' + new_lib_name)
 	update_init_file()
